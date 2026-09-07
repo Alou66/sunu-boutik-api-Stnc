@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+*.log
+server.log
+.git/
+.gitignore
+render.yaml
+uploads/
