@@ -17,6 +17,7 @@ class ShopStatus(str, enum.Enum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
+    SUSPENDED = "suspended"
 
 
 class Shop(Base):
@@ -43,6 +44,8 @@ class Shop(Base):
     payments = relationship("Payment", back_populates="shop", cascade="all, delete-orphan")
     transformation_logs = relationship("TransformationLog", back_populates="shop", cascade="all, delete-orphan")
     bon_clients = relationship("BonClient", back_populates="shop", cascade="all, delete-orphan")
+    suppliers = relationship("Supplier", back_populates="shop", cascade="all, delete-orphan")
+    stock_receipts = relationship("StockReceipt", back_populates="shop", cascade="all, delete-orphan")
 
 
 class User(Base):

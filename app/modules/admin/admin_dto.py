@@ -33,11 +33,20 @@ class RejectRequest(BaseModel):
     reason: Optional[str] = None
 
 
+class SuspendRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+class MessageOut(BaseModel):
+    message: str
+
+
 class OverviewOut(BaseModel):
     total_shops: int
     pending_shops: int
     approved_shops: int
     rejected_shops: int
+    suspended_shops: int
     total_invoices: int
     total_revenue: float
 

@@ -140,8 +140,10 @@ class InvoiceService:
                 form = line.form or "principale"
                 if form == "secondaire":
                     available, default_price, label = product.quantity_secondaire, product.unit_price_secondaire, product.unit_secondaire
+                    default_cost_price = product.purchase_price_secondaire
                 else:
                     available, default_price, label = product.quantity, product.unit_price, product.unit
+                    default_cost_price = product.purchase_price
                 if available < line.quantity:
                     raise InsufficientStockError(f"Stock insuffisant pour {product.name} ({label})")
                 if form == "secondaire":
@@ -155,6 +157,7 @@ class InvoiceService:
             else:
                 form = None
                 default_price = product.unit_price
+                default_cost_price = product.purchase_price
                 if product.quantity < line.quantity:
                     raise InsufficientStockError(f"Stock insuffisant pour {product.name}")
                 product.quantity -= line.quantity
@@ -171,6 +174,7 @@ class InvoiceService:
                 unit_price=unit_price,
                 line_total=line_total,
                 form=form,
+                cost_price=default_cost_price,
             ))
 
         invoice.total = total

@@ -31,6 +31,7 @@ from app.modules.identity.identity_service import (
     ShopNotFoundError,
     ShopPendingError,
     ShopRejectedError,
+    ShopSuspendedError,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -78,7 +79,7 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         token = IdentityService(db).login(payload.email, payload.password)
     except InvalidCredentialsError as e:
         raise HTTPException(status_code=401, detail=str(e))
-    except (ShopPendingError, ShopRejectedError, AccountDisabledError) as e:
+    except (ShopPendingError, ShopRejectedError, ShopSuspendedError, AccountDisabledError) as e:
         raise HTTPException(status_code=403, detail=str(e))
     return Token(access_token=token)
 

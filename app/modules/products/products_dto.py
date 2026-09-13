@@ -11,11 +11,15 @@ def _normalize_name(name: Optional[str]) -> Optional[str]:
 
 
 class ProductCreate(BaseModel):
+    # Pas de `quantity` ici : un article naît toujours à 0 en stock. Toute
+    # entrée de stock (y compris la dotation initiale) passe par le module
+    # Approvisionnement (app/modules/stock_receipts), seul habilité à
+    # incrémenter quantity/quantity_secondaire.
     name: str
     category_id: int
     reference: Optional[str] = None
     unit_price: float = Field(ge=0)
-    quantity: float = Field(default=0, ge=0)
+    purchase_price: float = Field(default=0, ge=0)
     unit: str = "unite"
     pack_size: float = Field(default=1, ge=1)
     is_transformable: bool = False
@@ -25,6 +29,7 @@ class ProductCreate(BaseModel):
     unit_secondaire: Optional[str] = None
     conversion_ratio: Optional[float] = Field(default=None, gt=0)
     unit_price_secondaire: Optional[float] = Field(default=None, ge=0)
+    purchase_price_secondaire: Optional[float] = Field(default=None, ge=0)
 
     @field_validator("name")
     @classmethod
@@ -33,18 +38,22 @@ class ProductCreate(BaseModel):
 
 
 class ProductUpdate(BaseModel):
+    # `quantity`/`quantity_secondaire` volontairement absents : voir
+    # ProductCreate ci-dessus. Ils ne sont modifiables que par
+    # StockReceiptService (approvisionnement) et TransformationService,
+    # directement sur l'entité ORM, jamais via cette API.
     name: Optional[str] = None
     category_id: Optional[int] = None
     reference: Optional[str] = None
     unit_price: Optional[float] = Field(default=None, ge=0)
-    quantity: Optional[float] = Field(default=None, ge=0)
+    purchase_price: Optional[float] = Field(default=None, ge=0)
     unit: Optional[str] = None
     pack_size: Optional[float] = Field(default=None, ge=1)
     is_transformable: Optional[bool] = None
     unit_secondaire: Optional[str] = None
     conversion_ratio: Optional[float] = Field(default=None, gt=0)
     unit_price_secondaire: Optional[float] = Field(default=None, ge=0)
-    quantity_secondaire: Optional[float] = Field(default=None, ge=0)
+    purchase_price_secondaire: Optional[float] = Field(default=None, ge=0)
 
     @field_validator("name")
     @classmethod
@@ -61,6 +70,7 @@ class ProductOut(BaseModel):
     category_name: str
     reference: Optional[str] = None
     unit_price: float
+    purchase_price: float
     quantity: float
     unit: str
     pack_size: float
@@ -68,6 +78,7 @@ class ProductOut(BaseModel):
     unit_secondaire: Optional[str] = None
     conversion_ratio: Optional[float] = None
     unit_price_secondaire: Optional[float] = None
+    purchase_price_secondaire: Optional[float] = None
     quantity_secondaire: float
     created_at: datetime
 

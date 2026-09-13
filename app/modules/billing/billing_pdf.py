@@ -18,7 +18,7 @@ def _build_client_label(client, client_name: str | None) -> str | None:
         if client.address:
             label += f" - {client.address}"
         return label
-    return client_name or None
+    return client_name or "Client Divers"
 
 
 def build_export_ticket_pdf(invoice, shop, client) -> bytes:

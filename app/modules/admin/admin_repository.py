@@ -1,4 +1,4 @@
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.modules.billing.billing_model import Invoice
@@ -40,10 +40,21 @@ class AdminRepository:
             result.setdefault(owner.shop_id, owner)
         return result
 
-    def list_shops_paginated(self, status_filter: str | None, page: int, page_size: int):
+    def list_shops_paginated(self, status_filter: str | None, page: int, page_size: int, search: str | None = None):
         query = self._db.query(Shop)
         if status_filter:
             query = query.filter(Shop.status == status_filter)
+        if search:
+            pattern = f"%{search.strip()}%"
+            owner_shop_ids = (
+                self._db.query(User.shop_id)
+                .filter(
+                    User.role == UserRole.OWNER,
+                    or_(User.full_name.ilike(pattern), User.email.ilike(pattern)),
+                )
+                .subquery()
+            )
+            query = query.filter(or_(Shop.name.ilike(pattern), Shop.id.in_(owner_shop_ids)))
         total = query.count()
         shops = (
             query.order_by(Shop.created_at.desc())

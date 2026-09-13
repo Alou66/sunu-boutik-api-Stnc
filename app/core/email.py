@@ -168,6 +168,90 @@ def send_shop_approved_email(
     send_email(owner_email, owner_name, "Votre boutique a été validée", html)
 
 
+def send_shop_suspended_email(
+    owner_name: str,
+    owner_email: str,
+    shop_name: str,
+    reason: str | None = None,
+    frontend_url: str | None = None,
+) -> None:
+    reason_html = f"<p><b>Motif :</b> {reason}</p>" if reason else ""
+    html = _layout(
+        title="Votre boutique a été suspendue",
+        intro=f"Bonjour {owner_name},",
+        body_html=(
+            f"<p>Votre boutique <b>{shop_name}</b> a été suspendue par l'administration.</p>"
+            f"{reason_html}"
+            "<p>L'accès de tous les comptes de la boutique est désactivé jusqu'à nouvel ordre. "
+            "Contactez notre équipe pour plus d'informations.</p>"
+        ),
+    )
+    send_email(owner_email, owner_name, "Votre boutique a été suspendue", html)
+
+
+def send_shop_reactivated_email(
+    owner_name: str,
+    owner_email: str,
+    shop_name: str,
+    frontend_url: str | None = None,
+) -> None:
+    login_url = f"{frontend_url or settings.FRONTEND_URL}/login"
+    html = _layout(
+        title="Votre boutique a été réactivée",
+        intro=f"Bonjour {owner_name},",
+        body_html=(
+            f"<p>Bonne nouvelle : votre boutique <b>{shop_name}</b> a été réactivée.</p>"
+            "<p>Vous et votre équipe pouvez de nouveau vous connecter avec vos identifiants habituels.</p>"
+        ),
+        button_label="Se connecter",
+        button_url=login_url,
+    )
+    send_email(owner_email, owner_name, "Votre boutique a été réactivée", html)
+
+
+def send_owner_password_reset_email(
+    owner_name: str,
+    owner_email: str,
+    shop_name: str,
+    temp_password: str,
+    frontend_url: str | None = None,
+) -> None:
+    login_url = f"{frontend_url or settings.FRONTEND_URL}/login"
+    credentials_box = f"""
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="background-color:#f3f4f6; border-radius:8px; margin:16px 0;">
+      <tr>
+        <td style="padding:16px 20px;">
+          <p style="margin:0 0 8px 0; font-size:12px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em;">
+            Votre nouveau mot de passe
+          </p>
+          <p style="margin:0 0 4px 0; font-size:14px; color:#111827;">
+            <b>Email :</b> {owner_email}
+          </p>
+          <p style="margin:0; font-size:14px; color:#111827;">
+            <b>Mot de passe temporaire :</b>
+            <span style="font-family:monospace; background-color:#fff; border:1px solid #e5e7eb; padding:2px 8px; border-radius:4px;">{temp_password}</span>
+          </p>
+        </td>
+      </tr>
+    </table>
+    """
+    html = _layout(
+        title="Réinitialisation de votre mot de passe",
+        intro=f"Bonjour {owner_name},",
+        body_html=(
+            f"<p>Un nouveau mot de passe temporaire a été généré pour votre boutique <b>{shop_name}</b> "
+            "à la demande de l'administration.</p>"
+            f"{credentials_box}"
+            "<p>Pour votre sécurité, il vous sera demandé de choisir un nouveau mot de passe "
+            "dès votre prochaine connexion.</p>"
+        ),
+        button_label="Se connecter maintenant",
+        button_url=login_url,
+    )
+    send_email(owner_email, owner_name, "Votre mot de passe a été réinitialisé", html)
+
+
 def send_shop_rejected_email(
     owner_name: str,
     owner_email: str,

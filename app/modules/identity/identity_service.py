@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password, verify_password
 from app.core.uploads import save_shop_logo
-from app.modules.identity.identity_model import Shop, ShopStatus, User
+from app.modules.identity.identity_model import Shop, ShopStatus, User, UserRole
 from app.modules.identity.identity_repository import IdentityRepository
 
 
@@ -19,6 +19,10 @@ class ShopPendingError(Exception):
 
 
 class ShopRejectedError(Exception):
+    pass
+
+
+class ShopSuspendedError(Exception):
     pass
 
 
@@ -102,17 +106,32 @@ class IdentityService:
 
     def login(self, email: str, password: str) -> str:
         user = self._repo.find_user_by_email(email)
-        if not user:
+        if not user or user.role == UserRole.ADMIN:
+            # Les comptes admin ne peuvent pas s'authentifier via la connexion boutique.
             raise InvalidCredentialsError("Email ou mot de passe incorrect")
 
-        if user.role != "admin":
-            shop = self._repo.get_shop_by_id(user.shop_id)
-            if not shop or shop.status == ShopStatus.PENDING:
-                raise ShopPendingError(
-                    "Votre demande est en cours de traitement. Vous ne pouvez pas encore vous connecter."
-                )
-            if shop.status == ShopStatus.REJECTED:
-                raise ShopRejectedError("Votre demande a été rejetée.")
+        shop = self._repo.get_shop_by_id(user.shop_id)
+        if not shop or shop.status == ShopStatus.PENDING:
+            raise ShopPendingError(
+                "Votre demande est en cours de traitement. Vous ne pouvez pas encore vous connecter."
+            )
+        if shop.status == ShopStatus.REJECTED:
+            raise ShopRejectedError("Votre demande a été rejetée.")
+        if shop.status == ShopStatus.SUSPENDED:
+            raise ShopSuspendedError("Votre boutique a été suspendue. Contactez l'administration.")
+
+        if not user.is_active or not user.hashed_password:
+            raise AccountDisabledError("Compte désactivé")
+
+        if not verify_password(password, user.hashed_password):
+            raise InvalidCredentialsError("Email ou mot de passe incorrect")
+
+        return create_access_token({"sub": str(user.id)})
+
+    def login_admin(self, email: str, password: str) -> str:
+        user = self._repo.find_user_by_email(email)
+        if not user or user.role != UserRole.ADMIN:
+            raise InvalidCredentialsError("Email ou mot de passe incorrect")
 
         if not user.is_active or not user.hashed_password:
             raise AccountDisabledError("Compte désactivé")

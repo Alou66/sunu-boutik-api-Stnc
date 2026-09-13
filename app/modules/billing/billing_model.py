@@ -88,6 +88,12 @@ class InvoiceLine(Base):
     quantity = Column(Float, nullable=False)
     unit_price = Column(Float, nullable=False)
     line_total = Column(Float, nullable=False)
+    # Coût d'achat capturé au moment de la vente (products.purchase_price, ou
+    # purchase_price_secondaire si form == "secondaire"), pour calculer un
+    # bénéfice réel par ligne dans le module Statistiques. NULL pour les lignes
+    # créées avant l'introduction de ce champ : le calcul des statistiques
+    # applique alors un fallback sur le purchase_price ACTUEL du produit.
+    cost_price = Column(Float, nullable=True)
     # Forme vendue pour un article transformable ("principale" ou
     # "secondaire") : détermine quel compteur de stock du Product a été
     # décrémenté, pour pouvoir le créditer correctement si la ligne est

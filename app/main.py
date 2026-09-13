@@ -19,6 +19,9 @@ from app.modules.identity.identity_model import User, UserRole
 from app.modules.identity.identity_route import router as identity_router
 from app.modules.payments.payments_route import router as payments_router
 from app.modules.products.products_route import router as products_router
+from app.modules.statistics.statistics_route import router as statistics_router
+from app.modules.stock_receipts.stock_receipts_route import router as stock_receipts_router
+from app.modules.suppliers.suppliers_route import router as suppliers_router
 from app.modules.transformations.transformations_route import router as transformations_router
 
 app = FastAPI(title="Sunu Boutik API")
@@ -64,6 +67,9 @@ app.include_router(payments_router)
 app.include_router(cashier_router)
 app.include_router(transformations_router)
 app.include_router(bon_client_router)
+app.include_router(suppliers_router)
+app.include_router(stock_receipts_router)
+app.include_router(statistics_router)
 
 
 def _seed_admin():
