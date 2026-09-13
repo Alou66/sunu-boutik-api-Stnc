@@ -11,6 +11,14 @@ class ShopNotFoundError(Exception):
     pass
 
 
+class InvalidShopStatusError(Exception):
+    pass
+
+
+class OwnerNotFoundError(Exception):
+    pass
+
+
 class AdminService:
     def __init__(self, db: Session):
         self._db = db
@@ -24,14 +32,15 @@ class AdminService:
             "pending_shops": status_counts.get(ShopStatus.PENDING, 0),
             "approved_shops": status_counts.get(ShopStatus.APPROVED, 0),
             "rejected_shops": status_counts.get(ShopStatus.REJECTED, 0),
+            "suspended_shops": status_counts.get(ShopStatus.SUSPENDED, 0),
             "total_invoices": total_invoices or 0,
             "total_revenue": total_revenue,
         }
 
-    def list_shops(self, status_filter: str | None, page: int, page_size: int):
+    def list_shops(self, status_filter: str | None, page: int, page_size: int, search: str | None = None):
         page = max(page, 1)
         page_size = min(max(page_size, 1), 100)
-        shops, total = self._repo.list_shops_paginated(status_filter, page, page_size)
+        shops, total = self._repo.list_shops_paginated(status_filter, page, page_size, search)
         owners_by_shop = self._repo.owners_by_shop_id([shop.id for shop in shops])
         total_pages = max((total + page_size - 1) // page_size, 1)
         return shops, owners_by_shop, total, page, page_size, total_pages
@@ -86,3 +95,47 @@ class AdminService:
 
         owner = self._repo.owner_of(shop)
         return shop, owner
+
+    def suspend_shop(self, shop_id: int, reason: str | None) -> tuple[Shop, User | None]:
+        shop = self._repo.get_shop_by_id(shop_id)
+        if not shop:
+            raise ShopNotFoundError("Boutique introuvable")
+        if shop.status != ShopStatus.APPROVED:
+            raise InvalidShopStatusError("Seule une boutique validée peut être suspendue")
+
+        shop.status = ShopStatus.SUSPENDED
+        self._repo.deactivate_all_users(shop_id)
+        self._db.commit()
+
+        owner = self._repo.owner_of(shop)
+        return shop, owner
+
+    def reactivate_shop(self, shop_id: int) -> tuple[Shop, User | None]:
+        shop = self._repo.get_shop_by_id(shop_id)
+        if not shop:
+            raise ShopNotFoundError("Boutique introuvable")
+        if shop.status != ShopStatus.SUSPENDED:
+            raise InvalidShopStatusError("Seule une boutique suspendue peut être réactivée")
+
+        shop.status = ShopStatus.APPROVED
+        self._repo.activate_other_users(shop_id, None)
+        self._db.commit()
+
+        owner = self._repo.owner_of(shop)
+        return shop, owner
+
+    def reset_owner_password(self, shop_id: int) -> tuple[Shop, User, str]:
+        shop = self._repo.get_shop_by_id(shop_id)
+        if not shop:
+            raise ShopNotFoundError("Boutique introuvable")
+
+        owner = self._repo.owner_of(shop)
+        if not owner or not owner.hashed_password:
+            raise OwnerNotFoundError("Cette boutique n'a pas encore de propriétaire actif")
+
+        temp_password = generate_temp_password()
+        owner.hashed_password = hash_password(temp_password)
+        owner.must_change_password = True
+        self._db.commit()
+
+        return shop, owner, temp_password

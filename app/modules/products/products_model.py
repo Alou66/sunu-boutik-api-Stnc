@@ -29,6 +29,11 @@ class Product(Base):
     name = Column(String(200), nullable=False)
     reference = Column(String(100), nullable=True)
     unit_price = Column(Float, nullable=False, default=0)
+    # Prix d'achat (coût fournisseur), distinct du prix de vente ci-dessus.
+    # Sert de valeur par défaut pour "Coût U" dans le module Approvisionnement
+    # (voir stock_receipts_service.py::_build_lines) ; l'utilisateur peut
+    # toujours le surcharger ligne par ligne au moment de la réception.
+    purchase_price = Column(Float, nullable=False, default=0, server_default="0")
     quantity = Column(Float, nullable=False, default=0)
     unit = Column(String(20), default="unite")
     pack_size = Column(Float, nullable=False, default=1)
@@ -44,6 +49,7 @@ class Product(Base):
     # secondaire (`unit_secondaire`).
     conversion_ratio = Column(Float, nullable=True)
     unit_price_secondaire = Column(Float, nullable=True)
+    purchase_price_secondaire = Column(Float, nullable=True)
     quantity_secondaire = Column(Float, nullable=False, default=0, server_default="0")
 
     shop = relationship("Shop", back_populates="products")

@@ -13,7 +13,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings  # noqa: E402
 from app.db.session import Base  # noqa: E402
-from app.models import models  # noqa: E402,F401  enregistre tous les modèles sur Base.metadata
+
+# Chaque import ci-dessous enregistre les tables du module sur Base.metadata
+# (nécessaire pour l'autogenerate). Il n'y a plus de module `app.models`
+# central depuis le passage à l'architecture par modules : on importe donc
+# chaque `*_model.py` directement, comme le fait déjà `app/main.py` de façon
+# indirecte via les routers.
+from app.modules.identity import identity_model  # noqa: E402,F401
+from app.modules.categories import categories_model  # noqa: E402,F401
+from app.modules.products import products_model  # noqa: E402,F401
+from app.modules.customers import customers_model  # noqa: E402,F401
+from app.modules.billing import billing_model  # noqa: E402,F401
+from app.modules.payments import payments_model  # noqa: E402,F401
+from app.modules.transformations import transformations_model  # noqa: E402,F401
+from app.modules.bon_client import bon_client_model  # noqa: E402,F401
+from app.modules.suppliers import suppliers_model  # noqa: E402,F401
+from app.modules.stock_receipts import stock_receipts_model  # noqa: E402,F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
