@@ -153,6 +153,36 @@ def test_update_shop_partial_and_empty_string_clears_field(client, auth_headers,
     assert resp.json()["address"] is None
 
 
+def test_employee_can_update_own_profile(client, employee_headers, employee):
+    resp = client.patch(
+        "/auth/me",
+        headers=employee_headers,
+        json={"full_name": "Nouveau Nom", "phone": "780000099", "email": "nouveau@example.com"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["full_name"] == "Nouveau Nom"
+    assert body["phone"] == "780000099"
+    assert body["email"] == "nouveau@example.com"
+
+
+def test_owner_can_update_own_profile(client, auth_headers, owner):
+    resp = client.patch("/auth/me", headers=auth_headers, json={"full_name": "Nouveau Owner"})
+    assert resp.status_code == 200
+    assert resp.json()["full_name"] == "Nouveau Owner"
+
+
+def test_update_me_empty_full_name_returns_400(client, employee_headers):
+    resp = client.patch("/auth/me", headers=employee_headers, json={"full_name": "  "})
+    assert resp.status_code == 400
+
+
+def test_update_me_duplicate_email_returns_400(client, employee_headers, owner):
+    resp = client.patch("/auth/me", headers=employee_headers, json={"email": owner.email})
+    assert resp.status_code == 400
+    assert "déjà utilisé" in resp.json()["detail"]
+
+
 def test_forgot_password_check_unknown_phone_returns_404(client):
     resp = client.post("/auth/forgot-password/check", json={"phone": "779999999"})
     assert resp.status_code == 404

@@ -37,6 +37,14 @@ class InvoiceLockedError(Exception):
     pass
 
 
+class InvoiceAlreadyCancelledError(Exception):
+    pass
+
+
+class InvoiceNotCancelledError(Exception):
+    pass
+
+
 class InvoiceService:
     def __init__(self, db: Session):
         self._db = db
@@ -44,7 +52,16 @@ class InvoiceService:
 
     # ---- Lecture ----
 
-    def list(self, shop_id: int, page: int, page_size: int, search: str | None, date: str | None, status_filter: str | None):
+    def list(
+        self,
+        shop_id: int,
+        page: int,
+        page_size: int,
+        search: str | None,
+        date: str | None,
+        status_filter: str | None,
+        employee_id: int | None = None,
+    ):
         from app.modules.billing.billing_model import InvoiceStatus
 
         page = max(page, 1)
@@ -61,7 +78,7 @@ class InvoiceService:
             except ValueError:
                 raise InvoiceValidationError("Date invalide, format attendu AAAA-MM-JJ")
 
-        return self._repo.list_paginated(shop_id, page, page_size, search, status_filter, date)
+        return self._repo.list_paginated(shop_id, page, page_size, search, status_filter, date, employee_id)
 
     def get(self, shop_id: int, invoice_id: int) -> Invoice:
         invoice = self._repo.get_by_id(shop_id, invoice_id)
@@ -85,8 +102,8 @@ class InvoiceService:
     # ---- Numérotation & verrouillage ----
 
     def _generate_invoice_number(self, shop_id: int) -> str:
-        count = self._repo.count_for_shop(shop_id)
-        return f"FA{datetime.utcnow().strftime('%Y%m%d')}-{count + 1:04d}"
+        seq = self._repo.next_sequence_for_shop(shop_id)
+        return f"FA{datetime.utcnow().strftime('%Y%m%d')}-{seq:04d}"
 
     def _lock_shop_for_numbering(self, shop_id: int) -> None:
         """Verrouille la ligne shop le temps de générer+insérer le numéro de facture.
@@ -181,7 +198,15 @@ class InvoiceService:
 
     # ---- Écriture ----
 
-    def create(self, shop_id: int, client_id: int | None, client_name: str | None, note: str | None, lines_payload: list) -> Invoice:
+    def create(
+        self,
+        shop_id: int,
+        client_id: int | None,
+        client_name: str | None,
+        note: str | None,
+        lines_payload: list,
+        created_by_id: int | None = None,
+    ) -> Invoice:
         if not lines_payload:
             raise InvoiceValidationError("La facture doit contenir au moins un article")
 
@@ -200,6 +225,7 @@ class InvoiceService:
             client_name=client_name if client_id is None else None,
             number=self._generate_invoice_number(shop_id),
             note=note,
+            created_by_id=created_by_id,
             total=0,
         )
         self._db.add(invoice)
@@ -217,6 +243,9 @@ class InvoiceService:
 
     def update(self, shop_id: int, invoice_id: int, client_id: int | None, client_name: str | None, note: str | None, lines_payload: list) -> Invoice:
         invoice = self.get(shop_id, invoice_id)
+
+        if invoice.is_cancelled:
+            raise InvoiceLockedError("Cette facture est annulée, elle ne peut plus être modifiée")
 
         if invoice.amount_paid > AMOUNT_EPSILON:
             raise InvoiceLockedError(
@@ -243,3 +272,57 @@ class InvoiceService:
         self._db.commit()
         self._db.refresh(invoice)
         return invoice
+
+    # ---- Annulation / suppression ----
+
+    def cancel(self, shop_id: int, invoice_id: int, user_id: int, reason: str) -> Invoice:
+        # Verrou FOR UPDATE : sérialise avec un paiement ou une autre annulation
+        # concurrente sur la même facture (même logique que PaymentService.void).
+        invoice = self._repo.get_by_id_locked(shop_id, invoice_id)
+        if not invoice:
+            raise InvoiceNotFoundError("Facture introuvable")
+
+        if invoice.is_cancelled:
+            raise InvoiceAlreadyCancelledError("Cette facture est déjà annulée")
+
+        if invoice.amount_paid > AMOUNT_EPSILON:
+            raise InvoiceLockedError(
+                "Impossible d'annuler une facture ayant déjà reçu un paiement. "
+                "Annulez d'abord le ou les paiements associés."
+            )
+
+        # Recrédite le stock de chaque ligne. Verrouille les produits dans un
+        # ordre déterministe (product_id croissant) pour éviter un deadlock si
+        # une autre facture/réception verrouille les mêmes articles en parallèle
+        # (même précaution que StockReceiptService.cancel).
+        for line in sorted(invoice.lines, key=lambda l: l.product_id):
+            product = self._db.query(Product).filter(Product.id == line.product_id).with_for_update().first()
+            if product:
+                if line.form == "secondaire":
+                    product.quantity_secondaire += line.quantity
+                else:
+                    product.quantity += line.quantity
+
+        invoice.cancelled_at = datetime.utcnow()
+        invoice.cancelled_by_id = user_id
+        invoice.cancel_reason = reason
+
+        self._db.commit()
+        self._db.refresh(invoice)
+        return invoice
+
+    def delete(self, shop_id: int, invoice_id: int) -> None:
+        invoice = self._repo.get_by_id_locked(shop_id, invoice_id)
+        if not invoice:
+            raise InvoiceNotFoundError("Facture introuvable")
+
+        if not invoice.is_cancelled:
+            raise InvoiceNotCancelledError(
+                "Seule une facture annulée peut être supprimée. Annulez-la d'abord."
+            )
+
+        # Les lignes et paiements (déjà annulés puisque cancel() exige
+        # amount_paid == 0) sont supprimés en cascade (cascade="all, delete-orphan"
+        # sur Invoice.lines / Invoice.payments).
+        self._db.delete(invoice)
+        self._db.commit()

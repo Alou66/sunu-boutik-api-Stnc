@@ -54,6 +54,10 @@ class PhoneNotFoundError(Exception):
     pass
 
 
+class ProfileValidationError(Exception):
+    pass
+
+
 class IdentityService:
     def __init__(self, db: Session):
         self._db = db
@@ -126,7 +130,7 @@ class IdentityService:
         if not verify_password(password, user.hashed_password):
             raise InvalidCredentialsError("Email ou mot de passe incorrect")
 
-        return create_access_token({"sub": str(user.id)})
+        return create_access_token({"sub": str(user.id), "tv": user.token_version})
 
     def login_admin(self, email: str, password: str) -> str:
         user = self._repo.find_user_by_email(email)
@@ -139,7 +143,7 @@ class IdentityService:
         if not verify_password(password, user.hashed_password):
             raise InvalidCredentialsError("Email ou mot de passe incorrect")
 
-        return create_access_token({"sub": str(user.id)})
+        return create_access_token({"sub": str(user.id), "tv": user.token_version})
 
     def get_shop_for_user(self, user: User) -> Shop | None:
         if not user.shop_id:
@@ -155,6 +159,31 @@ class IdentityService:
         user.hashed_password = hash_password(new_password)
         user.must_change_password = False
         self._db.commit()
+
+    def update_profile(self, user: User, data: dict) -> User:
+        # Un utilisateur (owner ou employee) modifie ici ses propres informations
+        # personnelles. Pour un employee, c'est le seul moyen de les changer :
+        # le propriétaire de la boutique ne peut plus le faire à sa place (voir
+        # EmployeeService.update, restreint à mot de passe/activation).
+        if "full_name" in data:
+            if not data["full_name"]:
+                raise ProfileValidationError("Le nom complet est requis")
+            user.full_name = data["full_name"]
+
+        if "phone" in data:
+            if not data["phone"]:
+                raise ProfileValidationError("Le téléphone est requis")
+            user.phone = data["phone"]
+
+        if "email" in data and data["email"] is not None and data["email"] != user.email:
+            existing = self._repo.find_user_by_email(data["email"])
+            if existing and existing.id != user.id:
+                raise EmailAlreadyUsedError("Cet email est déjà utilisé")
+            user.email = data["email"]
+
+        self._db.commit()
+        self._db.refresh(user)
+        return user
 
     def update_shop(self, user: User, data: dict) -> Shop:
         shop = self._repo.get_shop_by_id(user.shop_id)

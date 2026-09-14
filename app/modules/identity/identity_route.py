@@ -1,7 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user
+from app.core.deps import get_current_owner, get_current_user
 from app.core.email import send_signup_pending_emails
 from app.core.limiter import limiter
 from app.db.session import get_db
@@ -10,13 +10,15 @@ from app.modules.identity.identity_dto import (
     ForgotPasswordCheck,
     LoginRequest,
     MeOut,
+    MeUpdate,
     RegisterResponse,
     ResetPasswordRequest,
     ShopOut,
     ShopUpdate,
     Token,
+    UserOut,
 )
-from app.modules.identity.identity_mapper import to_me_out, to_shop_out
+from app.modules.identity.identity_mapper import to_me_out, to_shop_out, to_user_out
 from app.modules.identity.identity_model import User
 from app.modules.identity.identity_service import (
     AccountDisabledError,
@@ -27,6 +29,7 @@ from app.modules.identity.identity_service import (
     InvalidCredentialsError,
     NewPasswordTooShortError,
     PhoneNotFoundError,
+    ProfileValidationError,
     ResetPasswordTooShortError,
     ShopNotFoundError,
     ShopPendingError,
@@ -90,6 +93,21 @@ def me(current_user: User = Depends(get_current_user), db: Session = Depends(get
     return to_me_out(current_user, shop)
 
 
+@router.patch("/me", response_model=UserOut)
+def update_me(
+    payload: MeUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        user = IdentityService(db).update_profile(current_user, payload.model_dump(exclude_unset=True))
+    except ProfileValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except EmailAlreadyUsedError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return to_user_out(user)
+
+
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
 def change_password(
     payload: ChangePasswordRequest,
@@ -107,7 +125,7 @@ def change_password(
 @router.patch("/shop", response_model=ShopOut)
 def update_shop(
     payload: ShopUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_owner),
     db: Session = Depends(get_db),
 ):
     try:

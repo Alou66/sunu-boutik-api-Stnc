@@ -17,6 +17,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
+from app.core.limiter import limiter
 from app.core.security import create_access_token, hash_password
 from app.db.session import Base, SessionLocal, engine
 from app.main import app
@@ -39,6 +40,16 @@ def _clean_tables():
     table_names = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
     with engine.begin() as conn:
         conn.execute(text(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE"))
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    # `limiter` (slowapi) a un default_limits global partagé par tous les
+    # tests du process (même clé : TestClient utilise toujours la même IP
+    # factice) : sans reset, des tests sans rapport entre eux peuvent se
+    # bloquer les uns les autres en 429 une fois le budget épuisé.
+    limiter.reset()
+    yield
 
 
 @pytest.fixture
@@ -83,7 +94,30 @@ def owner(db_session, shop):
 
 @pytest.fixture
 def auth_headers(owner):
-    token = create_access_token({"sub": str(owner.id)})
+    token = create_access_token({"sub": str(owner.id), "tv": owner.token_version})
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def employee(db_session, shop):
+    user = User(
+        shop_id=shop.id,
+        full_name="Employé Test",
+        email="employee@example.com",
+        phone="770000001",
+        hashed_password=hash_password("Test1234!"),
+        role=UserRole.EMPLOYEE,
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+@pytest.fixture
+def employee_headers(employee):
+    token = create_access_token({"sub": str(employee.id), "tv": employee.token_version})
     return {"Authorization": f"Bearer {token}"}
 
 

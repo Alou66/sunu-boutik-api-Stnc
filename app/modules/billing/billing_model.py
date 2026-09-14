@@ -15,6 +15,7 @@ class InvoiceStatus(str, enum.Enum):
     UNPAID = "unpaid"
     PARTIAL = "partial"
     PAID = "paid"
+    CANCELLED = "cancelled"
 
 
 class Invoice(Base):
@@ -50,10 +51,23 @@ class Invoice(Base):
     # `status` ci-dessous, pour garantir qu'il ne peut pas diverger du montant payé.
     amount_paid = Column(Float, nullable=False, default=0, server_default="0")
     note = Column(Text, nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Annulation "douce" (même logique que Payment.voided_at) : la facture et
+    # ses lignes sont conservées pour l'historique, le stock déjà décrémenté
+    # par InvoiceService.cancel est recrédité, et le statut dérivé ci-dessous
+    # bascule sur CANCELLED indépendamment de amount_paid. Une facture
+    # annulée peut ensuite être supprimée définitivement (InvoiceService.delete).
+    cancelled_at = Column(DateTime, nullable=True)
+    cancelled_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    # Nullable en base (factures jamais annulées) mais rendu obligatoire par le
+    # schéma Pydantic de l'endpoint /cancel, pour la traçabilité.
+    cancel_reason = Column(Text, nullable=True)
 
     shop = relationship("Shop", back_populates="invoices")
     client = relationship("Client")
+    created_by = relationship("User", foreign_keys=[created_by_id])
+    cancelled_by = relationship("User", foreign_keys=[cancelled_by_id])
     lines = relationship("InvoiceLine", back_populates="invoice", cascade="all, delete-orphan")
     payments = relationship(
         "Payment",
@@ -67,7 +81,13 @@ class Invoice(Base):
         return max(self.total - self.amount_paid, 0.0)
 
     @property
+    def is_cancelled(self) -> bool:
+        return self.cancelled_at is not None
+
+    @property
     def status(self) -> InvoiceStatus:
+        if self.is_cancelled:
+            return InvoiceStatus.CANCELLED
         if self.amount_paid <= AMOUNT_EPSILON:
             return InvoiceStatus.UNPAID
         if self.amount_paid >= self.total - AMOUNT_EPSILON:

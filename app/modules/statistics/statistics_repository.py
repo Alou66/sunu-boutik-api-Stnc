@@ -62,9 +62,17 @@ class StatisticsRepository:
     # ---- Bloc ventes de la période ----
 
     def sales_period(self, shop_id: int, start: datetime, end: datetime) -> dict:
+        # Une facture annulée (Invoice.cancelled_at renseigné) ne compte ni
+        # comme chiffre facturé, ni comme bénéfice : InvoiceService.cancel a
+        # recrédité le stock, ce n'est donc plus une vente réelle.
         invoiced_total, invoices_count = (
             self._db.query(func.coalesce(func.sum(Invoice.total), 0), func.count(Invoice.id))
-            .filter(Invoice.shop_id == shop_id, Invoice.created_at >= start, Invoice.created_at < end)
+            .filter(
+                Invoice.shop_id == shop_id,
+                Invoice.created_at >= start,
+                Invoice.created_at < end,
+                Invoice.cancelled_at.is_(None),
+            )
             .one()
         )
 
@@ -89,7 +97,12 @@ class StatisticsRepository:
             )
             .join(Invoice, Invoice.id == InvoiceLine.invoice_id)
             .join(Product, Product.id == InvoiceLine.product_id)
-            .filter(Invoice.shop_id == shop_id, Invoice.created_at >= start, Invoice.created_at < end)
+            .filter(
+                Invoice.shop_id == shop_id,
+                Invoice.created_at >= start,
+                Invoice.created_at < end,
+                Invoice.cancelled_at.is_(None),
+            )
             .scalar()
         )
 
@@ -126,7 +139,7 @@ class StatisticsRepository:
         last_sale_subq = (
             self._db.query(InvoiceLine.product_id, func.max(Invoice.created_at).label("last_sale_at"))
             .join(Invoice, Invoice.id == InvoiceLine.invoice_id)
-            .filter(Invoice.shop_id == shop_id)
+            .filter(Invoice.shop_id == shop_id, Invoice.cancelled_at.is_(None))
             .group_by(InvoiceLine.product_id)
             .subquery()
         )

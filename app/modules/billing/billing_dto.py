@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.billing.billing_model import InvoiceStatus
 
@@ -29,6 +29,18 @@ class InvoiceUpdate(BaseModel):
     lines: list[InvoiceLineCreate]
 
 
+class InvoiceCancelRequest(BaseModel):
+    reason: str = Field(min_length=1)
+
+    @field_validator("reason")
+    @classmethod
+    def strip_reason(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Le motif d'annulation est requis")
+        return v
+
+
 class InvoiceLineOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -53,7 +65,13 @@ class InvoiceOut(BaseModel):
     balance_due: float
     status: InvoiceStatus
     note: Optional[str] = None
+    created_by_id: Optional[int] = None
+    created_by_name: Optional[str] = None
     created_at: datetime
+    cancelled_at: Optional[datetime] = None
+    cancelled_by_id: Optional[int] = None
+    cancelled_by_name: Optional[str] = None
+    cancel_reason: Optional[str] = None
     lines: list[InvoiceLineOut] = []
 
 

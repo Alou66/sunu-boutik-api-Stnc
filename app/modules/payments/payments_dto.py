@@ -43,6 +43,7 @@ class PaymentOut(BaseModel):
     change: Optional[float] = None
     note: Optional[str] = None
     created_by_id: Optional[int] = None
+    created_by_name: Optional[str] = None
     created_at: datetime
     voided_at: Optional[datetime] = None
     void_reason: Optional[str] = None

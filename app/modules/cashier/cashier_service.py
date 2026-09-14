@@ -28,6 +28,9 @@ class CashierService:
         day_start = parse_day(date)
         day_end = day_start + timedelta(days=1)
 
+        # Une facture annulée (cancelled_at renseigné) a été recréditée en stock
+        # par InvoiceService.cancel : ce n'est plus une vente, elle ne doit donc
+        # pas gonfler le chiffre facturé du jour.
         invoices_count, total_invoiced = (
             self._db.query(
                 func.count(Invoice.id),
@@ -37,6 +40,7 @@ class CashierService:
                 Invoice.shop_id == shop_id,
                 Invoice.created_at >= day_start,
                 Invoice.created_at < day_end,
+                Invoice.cancelled_at.is_(None),
             )
             .one()
         )

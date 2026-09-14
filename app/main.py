@@ -15,6 +15,7 @@ from app.modules.cashier.cashier_route import router as cashier_router
 from app.modules.categories.categories_route import router as categories_router
 from app.modules.customers.customers_route import router as customers_router
 from app.modules.bon_client.bon_client_route import router as bon_client_router
+from app.modules.employees.employees_route import router as employees_router
 from app.modules.identity.identity_model import User, UserRole
 from app.modules.identity.identity_route import router as identity_router
 from app.modules.payments.payments_route import router as payments_router
@@ -70,6 +71,7 @@ app.include_router(bon_client_router)
 app.include_router(suppliers_router)
 app.include_router(stock_receipts_router)
 app.include_router(statistics_router)
+app.include_router(employees_router)
 
 
 def _seed_admin():

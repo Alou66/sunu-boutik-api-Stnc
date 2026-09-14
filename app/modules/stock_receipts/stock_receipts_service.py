@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List
 
 from sqlalchemy.orm import Session
 
@@ -74,7 +75,7 @@ class StockReceiptService:
 
     # ---- Construction des lignes (partagée create/update) ----
 
-    def _build_lines(self, shop_id: int, lines_payload: list) -> tuple[list[StockReceiptLine], float]:
+    def _build_lines(self, shop_id: int, lines_payload: list) -> tuple[List[StockReceiptLine], float]:
         if not lines_payload:
             raise StockReceiptValidationError("L'approvisionnement doit contenir au moins un article")
 

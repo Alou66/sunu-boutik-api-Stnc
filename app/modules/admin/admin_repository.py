@@ -15,7 +15,13 @@ class AdminRepository:
         return dict(self._db.query(Shop.status, func.count(Shop.id)).group_by(Shop.status).all())
 
     def invoice_totals(self) -> tuple[int, float]:
-        count, total = self._db.query(func.count(Invoice.id), func.coalesce(func.sum(Invoice.total), 0)).one()
+        # Exclut les factures annulées : le stock qu'elles représentaient a été
+        # recrédité (InvoiceService.cancel), ce n'est donc plus du revenu réel.
+        count, total = (
+            self._db.query(func.count(Invoice.id), func.coalesce(func.sum(Invoice.total), 0))
+            .filter(Invoice.cancelled_at.is_(None))
+            .one()
+        )
         return count, float(total or 0)
 
     def owner_of(self, shop: Shop) -> User | None:
@@ -73,7 +79,7 @@ class AdminRepository:
         users_count = self._db.query(func.count(User.id)).filter(User.shop_id == shop_id).scalar_subquery()
         invoices_count, total_revenue = (
             self._db.query(func.count(Invoice.id), func.coalesce(func.sum(Invoice.total), 0))
-            .filter(Invoice.shop_id == shop_id)
+            .filter(Invoice.shop_id == shop_id, Invoice.cancelled_at.is_(None))
             .one()
         )
         products_count, clients_count, users_count = self._db.query(products_count, clients_count, users_count).one()

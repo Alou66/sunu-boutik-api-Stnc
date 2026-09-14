@@ -1,6 +1,13 @@
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
+
+
+def _normalize(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
 
 
 class LoginRequest(BaseModel):
@@ -37,9 +44,21 @@ class UserOut(BaseModel):
     id: int
     full_name: str
     email: str
+    phone: Optional[str] = None
     role: str
     shop_id: Optional[int] = None
     must_change_password: bool
+
+
+class MeUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+    @field_validator("full_name", "phone")
+    @classmethod
+    def normalize(cls, v: Optional[str]) -> Optional[str]:
+        return _normalize(v)
 
 
 class ShopOut(BaseModel):
