@@ -68,7 +68,7 @@ Le code est organisé en **modules verticaux** (`app/modules/<domaine>/`), chacu
 | ORM / migrations | SQLAlchemy 2.0 + Alembic |
 | Authentification | JWT (`python-jose`) + hachage `bcrypt` via `passlib` |
 | Rate limiting | `slowapi` (ex : 5 tentatives/min sur l'inscription, 10/min sur le login) |
-| Emails transactionnels | API [Brevo](https://www.brevo.com/) (notifications d'inscription) |
+| Emails transactionnels | SMTP Gmail (notifications d'inscription) |
 | Génération de PDF | `reportlab` (factures) |
 | Export Excel | `openpyxl` |
 | Tests | `pytest` (tests dits "characterization" par module) |
@@ -86,7 +86,7 @@ sunu-boutik-api/
 │   │   ├── config.py         # Settings (variables d'environnement, pydantic-settings)
 │   │   ├── security.py       # Hash mot de passe, création/décodage JWT
 │   │   ├── deps.py           # Dépendances FastAPI : get_current_user, get_current_admin
-│   │   ├── email.py          # Envoi d'emails transactionnels (Brevo)
+│   │   ├── email.py          # Envoi d'emails transactionnels (SMTP Gmail)
 │   │   ├── limiter.py        # Configuration slowapi (rate limiting)
 │   │   └── uploads.py        # Gestion des fichiers uploadés (logos, etc.)
 │   ├── db/
@@ -127,7 +127,7 @@ Copier `.env.example` vers `.env` et renseigner :
 | `SECRET_KEY` | Clé secrète de signature des JWT |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Durée de validité du token (défaut : 1440 = 24h) |
 | `CORS_ORIGINS` | Origines autorisées, séparées par des virgules |
-| `BREVO_API_KEY` / `BREVO_SENDER_EMAIL` / `BREVO_SENDER_NAME` | Config email transactionnel (notifications d'inscription) |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_SENDER_NAME` | Config email transactionnel (notifications d'inscription) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Compte admin plateforme auto-créé au démarrage |
 | `FRONTEND_URL` | URL du frontend (utilisée dans les liens des emails) |
 
@@ -254,7 +254,7 @@ Inscription boutique (web /register)
 POST /auth/register  ──►  Shop(status=pending) + User(role=owner)
         │
         ▼
-Email de notification (Brevo) à l'équipe + au commerçant
+Email de notification (SMTP Gmail) à l'équipe + au commerçant
         │
         ▼
 Admin plateforme (web /admin) ──► POST /admin/shops/{id}/approve | /reject

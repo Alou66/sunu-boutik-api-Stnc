@@ -19,11 +19,15 @@ services:
         value: "1440"
       - key: CORS_ORIGINS
         sync: false
-      - key: BREVO_API_KEY
+      - key: SMTP_HOST
+        value: "smtp.gmail.com"
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
         sync: false
-      - key: BREVO_SENDER_EMAIL
+      - key: SMTP_PASSWORD
         sync: false
-      - key: BREVO_SENDER_NAME
+      - key: SMTP_SENDER_NAME
         value: "Sunu Boutik"
       - key: ADMIN_EMAIL
         sync: false

@@ -1,12 +1,11 @@
 import logging
-
-import httpx
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-
-BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 
 BRAND_COLOR = "#2563eb"
 
@@ -66,26 +65,24 @@ def _layout(title: str, intro: str, body_html: str, button_label: str | None = N
 
 
 def send_email(to_email: str, to_name: str, subject: str, html_content: str) -> None:
-    if not settings.BREVO_API_KEY or not settings.BREVO_SENDER_EMAIL:
-        logger.warning("Brevo non configuré, email non envoyé à %s", to_email)
+    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+        logger.warning("SMTP non configuré, email non envoyé à %s", to_email)
         return
 
-    payload = {
-        "sender": {"name": settings.BREVO_SENDER_NAME, "email": settings.BREVO_SENDER_EMAIL},
-        "to": [{"email": to_email, "name": to_name}],
-        "subject": subject,
-        "htmlContent": html_content,
-    }
-    headers = {
-        "api-key": settings.BREVO_API_KEY,
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
+    message = MIMEMultipart("alternative")
+    message["Subject"] = subject
+    message["From"] = f"{settings.SMTP_SENDER_NAME} <{settings.SMTP_USER}>"
+    message["To"] = f"{to_name} <{to_email}>"
+    message.attach(MIMEText(html_content, "html"))
+
     try:
-        resp = httpx.post(BREVO_URL, json=payload, headers=headers, timeout=10)
-        if resp.status_code >= 300:
-            logger.error("Echec envoi email Brevo (%s): %s", resp.status_code, resp.text)
-    except httpx.HTTPError as exc:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as server:
+            server.starttls()
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.sendmail(settings.SMTP_USER, [to_email], message.as_string())
+    except smtplib.SMTPException as exc:
+        logger.error("Echec envoi email SMTP à %s: %s", to_email, exc)
+    except OSError as exc:
         logger.error("Erreur réseau lors de l'envoi de l'email: %s", exc)
 
 

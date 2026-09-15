@@ -8,9 +8,11 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:3000"
     ALGORITHM: str = "HS256"
 
-    BREVO_API_KEY: str | None = None
-    BREVO_SENDER_EMAIL: str | None = None
-    BREVO_SENDER_NAME: str = "Sunu Boutik"
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_SENDER_NAME: str = "Sunu Boutik"
 
     ADMIN_EMAIL: str | None = None
     ADMIN_PASSWORD: str | None = None
