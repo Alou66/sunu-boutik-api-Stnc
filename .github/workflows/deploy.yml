@@ -63,6 +63,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           envs: GHCR_TOKEN,GHCR_USER
           script: |
+            exec 200>/tmp/sunu-boutik-deploy.lock
+            flock -w 300 200
             set -e
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             cd ~/sunu-boutik-infra
