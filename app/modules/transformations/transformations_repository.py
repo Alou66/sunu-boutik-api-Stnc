@@ -24,3 +24,10 @@ class TransformationRepository:
         self._db.commit()
         self._db.refresh(log)
         return log
+
+    def find_by_idempotency_key(self, shop_id: int, idempotency_key: str) -> TransformationLog | None:
+        return (
+            self._db.query(TransformationLog)
+            .filter(TransformationLog.shop_id == shop_id, TransformationLog.idempotency_key == idempotency_key)
+            .first()
+        )

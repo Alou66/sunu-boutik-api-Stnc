@@ -31,6 +31,7 @@ def execute_transformation(
         log, product = TransformationService(db).execute(
             current_user.shop_id, current_user.id,
             payload.product_id, payload.direction, payload.quantity, payload.note,
+            idempotency_key=payload.idempotency_key,
         )
     except ProductNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

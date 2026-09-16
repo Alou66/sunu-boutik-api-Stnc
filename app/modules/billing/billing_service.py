@@ -206,6 +206,7 @@ class InvoiceService:
         note: str | None,
         lines_payload: list,
         created_by_id: int | None = None,
+        idempotency_key: str | None = None,
     ) -> Invoice:
         if not lines_payload:
             raise InvoiceValidationError("La facture doit contenir au moins un article")
@@ -217,7 +218,18 @@ class InvoiceService:
 
         client_name = (client_name or "").strip() or None
 
+        # Sérialise avec toute autre création de facture pour cette boutique
+        # (voir _lock_shop_for_numbering). L'idempotence est vérifiée juste
+        # après ce verrou : une resoumission (double clic sur "Valider", retry
+        # réseau) concurrente attend ce même verrou puis retrouve la facture
+        # déjà créée par la première tentative, au lieu de décrémenter le
+        # stock une seconde fois pour la même vente.
         self._lock_shop_for_numbering(shop_id)
+
+        if idempotency_key:
+            existing = self._repo.find_by_idempotency_key(shop_id, idempotency_key)
+            if existing:
+                return existing
 
         invoice = Invoice(
             shop_id=shop_id,
@@ -227,12 +239,17 @@ class InvoiceService:
             note=note,
             created_by_id=created_by_id,
             total=0,
+            idempotency_key=idempotency_key,
         )
         self._db.add(invoice)
         try:
             self._db.flush()
         except IntegrityError:
             self._db.rollback()
+            if idempotency_key:
+                existing = self._repo.find_by_idempotency_key(shop_id, idempotency_key)
+                if existing:
+                    return existing
             raise NumberingConflictError("Conflit lors de la génération du numéro de facture, veuillez réessayer")
 
         self._apply_lines(invoice, lines_payload, shop_id)

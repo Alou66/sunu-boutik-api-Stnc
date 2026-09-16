@@ -45,6 +45,29 @@ def test_transform_insufficient_stock_returns_400(client, auth_headers, transfor
     assert "Stock insuffisant" in resp.json()["detail"]
 
 
+def test_transform_idempotency_key_replayed_returns_same_log(client, auth_headers, transformable_product):
+    payload = {
+        "product_id": transformable_product.id,
+        "direction": "to_secondaire",
+        "quantity": 1,
+        "idempotency_key": "retry-key-transfo-1",
+    }
+
+    first = client.post("/transformations/execute", headers=auth_headers, json=payload)
+    second = client.post("/transformations/execute", headers=auth_headers, json=payload)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["log"]["id"] == second.json()["log"]["id"]
+
+    history = client.get("/transformations/history", headers=auth_headers).json()
+    assert history["total"] == 1
+
+    product = client.get(f"/products/{transformable_product.id}", headers=auth_headers).json()
+    assert product["quantity"] == 2  # décrémenté une seule fois malgré les deux requêtes
+    assert product["quantity_secondaire"] == 4
+
+
 def test_transform_non_transformable_product_returns_400(client, auth_headers, simple_product):
     resp = client.post(
         "/transformations/execute",

@@ -93,6 +93,14 @@ class InvoiceRepository:
             .first()
         )
 
+    def find_by_idempotency_key(self, shop_id: int, idempotency_key: str) -> Invoice | None:
+        return (
+            self._db.query(Invoice)
+            .options(joinedload(Invoice.lines), joinedload(Invoice.created_by))
+            .filter(Invoice.shop_id == shop_id, Invoice.idempotency_key == idempotency_key)
+            .first()
+        )
+
     def next_sequence_for_shop(self, shop_id: int) -> int:
         """Prochain suffixe numérique de numéro de facture pour cette boutique.
 

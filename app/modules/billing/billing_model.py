@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import relationship
 
 from app.db.session import Base
@@ -37,6 +37,16 @@ class Invoice(Base):
         # garantit qu'aucun doublon ne peut être committé même si ce verrou est
         # contourné.
         UniqueConstraint("shop_id", "number", name="uq_invoices_shop_id_number"),
+        # Filet de sécurité contre la double soumission (double clic sur
+        # "Valider", retry réseau) : même mécanisme que
+        # uq_payments_shop_id_idempotency_key, voir InvoiceService.create.
+        Index(
+            "uq_invoices_shop_id_idempotency_key",
+            "shop_id",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=text("idempotency_key IS NOT NULL"),
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -63,6 +73,12 @@ class Invoice(Base):
     # Nullable en base (factures jamais annulées) mais rendu obligatoire par le
     # schéma Pydantic de l'endpoint /cancel, pour la traçabilité.
     cancel_reason = Column(Text, nullable=True)
+    # Idempotence : identifiant unique fourni par le client pour une tentative
+    # de création de facture donnée (voir InvoiceCreate.idempotency_key et
+    # PaymentCreate.idempotency_key pour le même mécanisme). Permet de rejouer
+    # une soumission (double clic sur "Valider", retry réseau) sans créer deux
+    # factures pour la même vente.
+    idempotency_key = Column(String(64), nullable=True)
 
     shop = relationship("Shop", back_populates="invoices")
     client = relationship("Client")

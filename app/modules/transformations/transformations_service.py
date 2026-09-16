@@ -1,3 +1,4 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.products.products_model import Product
@@ -29,16 +30,25 @@ class TransformationService:
         direction: TransformationDirection,
         quantity: float,
         note: str | None,
+        idempotency_key: str | None = None,
     ) -> tuple[TransformationLog, Product]:
         # FOR UPDATE : verrouille l'article le temps de déplacer le stock entre
         # ses deux compteurs, pour empêcher deux transformations concurrentes sur
         # le même article de se marcher dessus (même logique que le décrément de
-        # stock dans invoices.py::_apply_lines).
+        # stock dans invoices.py::_apply_lines). Deux resoumissions identiques
+        # (double clic, retry réseau) portent sur le même article : elles se
+        # sérialisent donc déjà sur ce verrou, ce qui rend la vérification
+        # d'idempotence ci-dessous fiable même sans transaction dédiée.
         product = self._products.get_by_id_locked(shop_id, product_id)
         if not product:
             raise ProductNotFoundError("Article introuvable")
         if not product.is_transformable:
             raise ProductNotTransformableError("Cet article n'est pas transformable")
+
+        if idempotency_key:
+            existing = self._logs.find_by_idempotency_key(shop_id, idempotency_key)
+            if existing:
+                return existing, product
 
         if direction == TransformationDirection.TO_SECONDAIRE:
             if product.quantity < quantity:
@@ -66,8 +76,19 @@ class TransformationService:
             quantity_to=quantity_to,
             note=note,
             created_by_id=user_id,
+            idempotency_key=idempotency_key,
         )
         self._db.add(log)
+        try:
+            self._db.flush()
+        except IntegrityError:
+            self._db.rollback()
+            if idempotency_key:
+                existing = self._logs.find_by_idempotency_key(shop_id, idempotency_key)
+                if existing:
+                    product = self._products.get_by_id(shop_id, product_id)
+                    return existing, product
+            raise
         self._db.commit()
         self._db.refresh(product)
         self._db.refresh(log)

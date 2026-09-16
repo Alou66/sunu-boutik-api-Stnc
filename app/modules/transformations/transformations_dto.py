@@ -13,6 +13,11 @@ class TransformationExecuteRequest(BaseModel):
     # Quantité exprimée dans la forme de départ (celle qu'on consomme).
     quantity: float = Field(gt=0)
     note: Optional[str] = None
+    # Généré côté client (identifiant stable par tentative de transformation,
+    # réutilisé si la requête est renvoyée) : permet à TransformationService.execute
+    # de détecter une resoumission (double clic, retry réseau) et de renvoyer le
+    # résultat déjà obtenu au lieu de déplacer le stock une seconde fois.
+    idempotency_key: Optional[str] = Field(default=None, max_length=64)
 
 
 class TransformationLogOut(BaseModel):

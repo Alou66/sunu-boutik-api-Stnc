@@ -63,7 +63,7 @@ def create_invoice(payload: InvoiceCreate, db: Session = Depends(get_db), curren
     try:
         invoice = InvoiceService(db).create(
             current_user.shop_id, payload.client_id, payload.client_name, payload.note, payload.lines,
-            created_by_id=current_user.id,
+            created_by_id=current_user.id, idempotency_key=payload.idempotency_key,
         )
     except InvoiceValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))

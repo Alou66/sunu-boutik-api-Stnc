@@ -4,6 +4,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from sqlalchemy.exc import OperationalError
 
 from app.core.config import settings
 from app.core.limiter import limiter
@@ -35,6 +36,33 @@ def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
         status_code=429,
         content={"detail": "Trop de requêtes, veuillez réessayer plus tard."},
+    )
+
+
+# Codes d'erreur Postgres transitoires liés à la concurrence (voir
+# https://www.postgresql.org/docs/current/errcodes-appendix.html) : deux
+# transactions peuvent, dans de rares cas, se verrouiller mutuellement même en
+# respectant un ordre de verrouillage cohérent (ex: verrou explicite FOR
+# UPDATE posé sur un produit par une vente, pendant qu'une réception de
+# marchandise en cours sur le même produit attend elle aussi ce verrou, la clé
+# étrangère de la ligne insérée par chacune re-sollicitant la même ligne
+# produit). Postgres détecte le cycle et annule l'une des deux transactions :
+# on la restitue au client comme un conflit propre et rejouable, plutôt que de
+# laisser remonter une 500 brute.
+_RETRYABLE_PG_ERROR_CODES = {
+    "40001",  # serialization_failure
+    "40P01",  # deadlock_detected
+}
+
+
+@app.exception_handler(OperationalError)
+def db_conflict_handler(request: Request, exc: OperationalError):
+    pgcode = getattr(getattr(exc, "orig", None), "pgcode", None)
+    if pgcode not in _RETRYABLE_PG_ERROR_CODES:
+        raise exc
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "Conflit d'accès concurrent détecté, veuillez réessayer."},
     )
 
 

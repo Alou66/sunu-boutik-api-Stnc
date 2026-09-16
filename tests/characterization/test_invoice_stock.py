@@ -73,6 +73,23 @@ def test_create_invoice_insufficient_stock_returns_400_and_does_not_decrement(cl
     assert stock["quantity"] == 10
 
 
+def test_create_invoice_idempotency_key_replayed_returns_same_invoice(client, auth_headers, simple_product):
+    payload = {"lines": [{"product_id": simple_product.id, "quantity": 3}], "idempotency_key": "retry-key-invoice-1"}
+
+    first = client.post("/invoices", headers=auth_headers, json=payload)
+    second = client.post("/invoices", headers=auth_headers, json=payload)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["id"] == second.json()["id"]
+
+    stock = client.get(f"/products/{simple_product.id}", headers=auth_headers).json()
+    assert stock["quantity"] == 7  # décrémenté une seule fois malgré les deux requêtes
+
+    invoices = client.get("/invoices", headers=auth_headers).json()
+    assert invoices["total"] == 1
+
+
 def test_invoice_number_format(client, auth_headers, simple_product):
     resp = client.post(
         "/invoices",

@@ -21,6 +21,12 @@ class Product(Base):
             name="ck_products_transformable_fields",
         ),
         CheckConstraint("quantity_secondaire >= 0", name="ck_products_quantity_secondaire_non_negative"),
+        # Filet de sécurité applicatif doublé ici (comme pour quantity_secondaire
+        # ci-dessus) : aucune vente/transformation ne doit pouvoir faire passer le
+        # stock en forme principale sous zéro, même en cas de bug applicatif — la
+        # vraie protection contre la survente concurrente reste le verrou FOR
+        # UPDATE posé sur la ligne produit (voir billing_service.py::_apply_lines).
+        CheckConstraint("quantity >= 0", name="ck_products_quantity_non_negative"),
     )
 
     id = Column(Integer, primary_key=True, index=True)

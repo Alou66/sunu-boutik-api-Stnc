@@ -20,6 +20,11 @@ class InvoiceCreate(BaseModel):
     client_name: Optional[str] = None
     note: Optional[str] = None
     lines: list[InvoiceLineCreate]
+    # Généré côté client (identifiant stable par tentative de validation,
+    # réutilisé si la requête est renvoyée) : permet à InvoiceService.create de
+    # détecter une resoumission (double clic, retry réseau) et de renvoyer la
+    # facture déjà créée au lieu d'en créer une seconde pour la même vente.
+    idempotency_key: Optional[str] = Field(default=None, max_length=64)
 
 
 class InvoiceUpdate(BaseModel):
