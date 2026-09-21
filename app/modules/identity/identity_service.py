@@ -1,6 +1,15 @@
+from datetime import datetime, timedelta
+
 from sqlalchemy.orm import Session
 
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    generate_reset_code,
+    hash_password,
+    hash_reset_code,
+    verify_password,
+    verify_reset_code,
+)
 from app.core.uploads import save_shop_logo
 from app.modules.identity.identity_model import Shop, ShopStatus, User, UserRole
 from app.modules.identity.identity_repository import IdentityRepository
@@ -46,16 +55,23 @@ class ResetPasswordTooShortError(Exception):
     pass
 
 
-class AccountNotFoundByPhoneError(Exception):
-    pass
-
-
-class PhoneNotFoundError(Exception):
+class InvalidResetCodeError(Exception):
+    # Volontairement unique pour : compte inconnu, aucun code actif, code
+    # erroné, expiré, déjà utilisé ou épuisé, afin que la réponse ne révèle ni
+    # l'existence d'un compte ni l'état de son code.
     pass
 
 
 class ProfileValidationError(Exception):
     pass
+
+
+PASSWORD_RESET_CODE_TTL = timedelta(minutes=15)
+PASSWORD_RESET_MAX_ATTEMPTS = 5
+# Délai minimal entre deux e-mails de code pour un même compte (anti-spam de la
+# boîte mail de la victime, en plus du rate limiting par IP de la route).
+PASSWORD_RESET_RESEND_COOLDOWN = timedelta(seconds=60)
+MIN_PASSWORD_LENGTH = 6
 
 
 class IdentityService:
@@ -158,6 +174,10 @@ class IdentityService:
 
         user.hashed_password = hash_password(new_password)
         user.must_change_password = False
+        # Coupe toutes les sessions ouvertes avec l'ancien mot de passe (voir
+        # core/deps.get_current_user : le claim "tv" des JWT déjà émis ne
+        # correspond plus).
+        user.token_version += 1
         self._db.commit()
 
     def update_profile(self, user: User, data: dict) -> User:
@@ -195,26 +215,79 @@ class IdentityService:
         self._db.refresh(shop)
         return shop
 
-    def forgot_password_check(self, phone: str) -> Shop:
-        phone = phone.strip()
-        shop = self._repo.get_shop_by_phone(phone)
-        if not shop:
-            raise AccountNotFoundByPhoneError("Aucun compte trouvé avec ce numéro")
-        user = self._repo.get_first_user_of_shop(shop.id)
-        if not user or not user.is_active:
-            raise AccountNotFoundByPhoneError("Aucun compte trouvé avec ce numéro")
-        return shop
+    @staticmethod
+    def _clear_reset_code(user: User) -> None:
+        user.reset_code_hash = None
+        user.reset_code_expires_at = None
+        user.reset_code_attempts = 0
 
-    def forgot_password_reset(self, phone: str, new_password: str) -> None:
-        phone = phone.strip()
-        if len(new_password) < 6:
-            raise ResetPasswordTooShortError("Le mot de passe doit contenir au moins 6 caractères")
-        shop = self._repo.get_shop_by_phone(phone)
-        if not shop:
-            raise PhoneNotFoundError("Numéro introuvable")
-        user = self._repo.get_first_user_of_shop(shop.id)
+    def request_password_reset(self, email: str) -> tuple[str, str, str] | None:
+        """Génère un code temporaire pour `email` et retourne (nom, e-mail, code) à
+        envoyer par e-mail, ou None si rien ne doit être envoyé (compte inconnu,
+        inactif, ou code déjà envoyé il y a moins d'une minute).
+
+        Vaut pour tout rôle, y compris ADMIN (l'administrateur de la plateforme) :
+        c'est le même compte `users`, avec sa propre connexion (login_admin), mais
+        aucune raison de le priver de ce mécanisme s'il oublie son mot de passe.
+
+        L'appelant répond de la même façon dans tous les cas : le code n'est
+        jamais retourné à l'utilisateur HTTP, uniquement au code d'envoi d'e-mail.
+        """
+        user = self._repo.find_user_by_email(email)
+        # Comptes inactifs (boutique en attente, rejetée, suspendue, employé
+        # désactivé) : ils ne peuvent pas se connecter, donc n'ont rien à
+        # réinitialiser.
         if not user or not user.is_active:
-            raise PhoneNotFoundError("Numéro introuvable")
+            return None
+
+        now = datetime.utcnow()
+        if user.reset_code_expires_at:
+            issued_at = user.reset_code_expires_at - PASSWORD_RESET_CODE_TTL
+            if issued_at + PASSWORD_RESET_RESEND_COOLDOWN > now:
+                return None
+
+        code = generate_reset_code()
+        user.reset_code_hash = hash_reset_code(user.id, code)
+        user.reset_code_expires_at = now + PASSWORD_RESET_CODE_TTL
+        user.reset_code_attempts = 0
+        full_name, user_email = user.full_name, user.email
+        self._db.commit()
+        return full_name, user_email, code
+
+    def confirm_password_reset(self, email: str, code: str, new_password: str) -> None:
+        # Contrôle de forme avant tout : un mot de passe trop court ne consomme
+        # pas le code et ne dit rien sur le compte.
+        if len(new_password) < MIN_PASSWORD_LENGTH:
+            raise ResetPasswordTooShortError(
+                f"Le mot de passe doit contenir au moins {MIN_PASSWORD_LENGTH} caractères"
+            )
+
+        user = self._repo.find_user_by_email_locked(email)
+        if (
+            not user
+            or not user.is_active
+            or not user.reset_code_hash
+            or not user.reset_code_expires_at
+        ):
+            raise InvalidResetCodeError("Code invalide ou expiré. Demandez un nouveau code.")
+
+        if user.reset_code_expires_at < datetime.utcnow():
+            self._clear_reset_code(user)
+            self._db.commit()
+            raise InvalidResetCodeError("Code invalide ou expiré. Demandez un nouveau code.")
+
+        if not verify_reset_code(user.id, (code or "").strip(), user.reset_code_hash):
+            user.reset_code_attempts += 1
+            if user.reset_code_attempts >= PASSWORD_RESET_MAX_ATTEMPTS:
+                # Code épuisé : il faut en redemander un (réponse identique ensuite).
+                self._clear_reset_code(user)
+            self._db.commit()
+            raise InvalidResetCodeError("Code invalide ou expiré. Demandez un nouveau code.")
+
         user.hashed_password = hash_password(new_password)
         user.must_change_password = False
+        # Coupe toutes les sessions ouvertes avec l'ancien mot de passe (voir
+        # core/deps.get_current_user) et consomme le code (usage unique).
+        user.token_version += 1
+        self._clear_reset_code(user)
         self._db.commit()

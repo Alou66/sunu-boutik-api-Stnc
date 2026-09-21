@@ -41,7 +41,8 @@ class ProductRepository:
         )
 
     def exists_with_name(self, shop_id: int, name: str, exclude_id: int | None = None) -> bool:
-        query = self._db.query(Product).filter(Product.shop_id == shop_id, Product.name == name)
+        # Insensible à la casse, comme l'index uq_products_shop_id_upper_name.
+        query = self._db.query(Product).filter(Product.shop_id == shop_id, func.upper(Product.name) == func.upper(name))
         if exclude_id is not None:
             query = query.filter(Product.id != exclude_id)
         return query.first() is not None

@@ -10,11 +10,11 @@ class IdentityRepository:
     def find_user_by_email(self, email: str) -> User | None:
         return self._db.query(User).filter(User.email == email).first()
 
+    def find_user_by_email_locked(self, email: str) -> User | None:
+        # FOR UPDATE : sérialise les tentatives de confirmation d'un même compte,
+        # pour que le compteur d'essais et l'usage unique du code tiennent même
+        # sous requêtes concurrentes.
+        return self._db.query(User).filter(User.email == email).with_for_update().first()
+
     def get_shop_by_id(self, shop_id: int) -> Shop | None:
         return self._db.query(Shop).filter(Shop.id == shop_id).first()
-
-    def get_shop_by_phone(self, phone: str) -> Shop | None:
-        return self._db.query(Shop).filter(Shop.phone == phone).first()
-
-    def get_first_user_of_shop(self, shop_id: int) -> User | None:
-        return self._db.query(User).filter(User.shop_id == shop_id).first()

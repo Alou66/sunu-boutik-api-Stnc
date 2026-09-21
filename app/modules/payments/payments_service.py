@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.billing.billing_model import AMOUNT_EPSILON, Invoice
-from app.modules.billing.billing_service import InvoiceNotFoundError
+from app.modules.billing.billing_service import InvoiceAlreadyCancelledError, InvoiceNotFoundError
 from app.modules.payments.payments_model import Payment
 from app.modules.payments.payments_repository import PaymentRepository
 
@@ -82,6 +82,13 @@ class PaymentService:
         # payer/annuler un paiement sur la même facture tant que celle-ci n'est
         # pas commitée/rollback, pour éviter tout dépassement concurrent du solde.
         invoice = self._get_owned_invoice_locked(shop_id, invoice_id)
+
+        # Une facture annulée (InvoiceService.cancel) ne doit plus recevoir de
+        # paiement : son stock a été recrédité et elle n'est plus un revenu. Sans
+        # ce contrôle, une facture annulée non payée gardait balance_due == total
+        # et acceptait un encaissement.
+        if invoice.is_cancelled:
+            raise InvoiceAlreadyCancelledError("Cette facture est annulée, elle ne peut plus recevoir de paiement")
 
         # Idempotence : si cette tentative d'encaissement a déjà abouti (retry
         # réseau, double soumission), on renvoie le paiement existant plutôt que

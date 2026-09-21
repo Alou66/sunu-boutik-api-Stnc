@@ -1,3 +1,4 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.categories.categories_model import Category
@@ -18,6 +19,14 @@ class CategoryValidationError(Exception):
 
 class CategoryHasProductsError(Exception):
     pass
+
+
+_UNIQUE_NAME_INDEX = "uq_categories_shop_id_lower_name"
+
+
+def _is_duplicate_name_violation(exc: IntegrityError) -> bool:
+    diag = getattr(exc.orig, "diag", None)
+    return getattr(diag, "constraint_name", None) == _UNIQUE_NAME_INDEX
 
 
 class CategoryService:
@@ -43,7 +52,15 @@ class CategoryService:
         if self._repo.exists_with_name(shop_id, name):
             raise DuplicateCategoryNameError("Une catégorie avec ce nom existe déjà")
         category = Category(shop_id=shop_id, name=name)
-        return self._repo.save_new(category)
+        try:
+            return self._repo.save_new(category)
+        except IntegrityError as exc:
+            # Deux créations simultanées du même nom passent toutes deux le
+            # contrôle exists_with_name ci-dessus : l'index unique tranche.
+            self._db.rollback()
+            if _is_duplicate_name_violation(exc):
+                raise DuplicateCategoryNameError("Une catégorie avec ce nom existe déjà")
+            raise
 
     def update(self, shop_id: int, category_id: int, name: str | None) -> Category:
         # name=None signifie "champ non fourni, ne pas toucher" — le routeur ne
@@ -57,7 +74,13 @@ class CategoryService:
             if self._repo.exists_with_name(shop_id, name, exclude_id=category_id):
                 raise DuplicateCategoryNameError("Une catégorie avec ce nom existe déjà")
             category.name = name
-        return self._repo.save(category)
+        try:
+            return self._repo.save(category)
+        except IntegrityError as exc:
+            self._db.rollback()
+            if _is_duplicate_name_violation(exc):
+                raise DuplicateCategoryNameError("Une catégorie avec ce nom existe déjà")
+            raise
 
     def delete(self, shop_id: int, category_id: int) -> None:
         from app.modules.products.products_repository import ProductRepository

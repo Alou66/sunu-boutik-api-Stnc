@@ -120,7 +120,29 @@ class InvoiceService:
 
     # ---- Lignes ----
 
+    def _lock_products_in_order(
+        self, invoice: Invoice, lines_payload: list, shop_id: int, revert_existing: bool
+    ) -> None:
+        """Verrouille (FOR UPDATE) tous les produits touchés, par product_id croissant.
+
+        Deux transactions qui manipulent les mêmes produits dans des ordres
+        différents (ex: [5, 2] et [2, 5]) peuvent se verrouiller mutuellement
+        (deadlock). En acquérant tous les verrous produits dans le même ordre
+        déterministe avant tout décrément/recrédit, la seconde transaction
+        attend simplement la première (même précaution que InvoiceService.cancel
+        et StockReceiptService.cancel). Les verrous étant réentrants dans une
+        même transaction, les requêtes FOR UPDATE par ligne ci-dessous restent
+        inchangées et ne re-bloquent pas.
+        """
+        product_ids = {line.product_id for line in lines_payload}
+        if revert_existing:
+            product_ids |= {old_line.product_id for old_line in invoice.lines}
+        for product_id in sorted(product_ids):
+            self._db.query(Product).filter(Product.id == product_id, Product.shop_id == shop_id).with_for_update().first()
+
     def _apply_lines(self, invoice: Invoice, lines_payload: list, shop_id: int, revert_existing: bool = False) -> None:
+        self._lock_products_in_order(invoice, lines_payload, shop_id, revert_existing)
+
         if revert_existing:
             for old_line in list(invoice.lines):
                 # FOR UPDATE : verrouille la ligne produit le temps de créditer son
@@ -259,7 +281,15 @@ class InvoiceService:
         return invoice
 
     def update(self, shop_id: int, invoice_id: int, client_id: int | None, client_name: str | None, note: str | None, lines_payload: list) -> Invoice:
-        invoice = self.get(shop_id, invoice_id)
+        # Verrou FOR UPDATE sur la facture : sérialise la modification avec un
+        # paiement (PaymentService.create), une annulation ou une suppression
+        # concurrente. Sans lui, le contrôle `amount_paid` ci-dessous pouvait
+        # être périmé au moment du commit (paiement encaissé entre-temps) et
+        # laisser total < amount_paid. Ordre des verrous : facture, puis
+        # produits (par product_id croissant), comme cancel().
+        invoice = self._repo.get_by_id_locked(shop_id, invoice_id)
+        if not invoice:
+            raise InvoiceNotFoundError("Facture introuvable")
 
         if invoice.is_cancelled:
             raise InvoiceLockedError("Cette facture est annulée, elle ne peut plus être modifiée")

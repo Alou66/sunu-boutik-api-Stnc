@@ -21,6 +21,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         detail="Compte désactivé. Contactez l'administrateur.",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    session_revoked_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Votre session n'est plus valide, veuillez vous reconnecter.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     try:
         payload = decode_access_token(token)
         user_id = payload.get("sub")
@@ -36,8 +41,15 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     # l'émission de ce token : on revérifie l'état actuel en base à chaque requête
     # plutôt qu'une seule fois au login, et on rejette les tokens émis avant la
     # dernière désactivation même si le compte est de nouveau actif.
-    if not user.is_active or payload.get("tv", 0) != user.token_version:
+    if not user.is_active:
         raise disabled_exception
+    # Compte actif mais token_version différent : mot de passe changé ou
+    # réinitialisé, ou compte désactivé puis réactivé, depuis l'émission du token.
+    # Ce n'est pas une désactivation : message distinct pour que le client
+    # n'affiche pas « compte désactivé » à un utilisateur qui doit seulement se
+    # reconnecter.
+    if payload.get("tv", 0) != user.token_version:
+        raise session_revoked_exception
     return user
 
 

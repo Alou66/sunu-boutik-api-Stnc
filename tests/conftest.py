@@ -12,6 +12,12 @@ os.environ["DATABASE_URL"] = "postgresql://testuser@127.0.0.1:5544/sunu_boutik_t
 os.environ["SECRET_KEY"] = "test-secret-key-not-for-production"
 os.environ.pop("ADMIN_EMAIL", None)
 os.environ.pop("ADMIN_PASSWORD", None)
+# Sans identifiants SMTP, core.email.send_email n'envoie rien (il logge un
+# warning) : les tests ne doivent jamais utiliser les identifiants Gmail du
+# `.env` de développement pour envoyer de vrais e-mails (approbation/rejet/
+# suspension de boutique déclenchent des envois en tâche de fond).
+os.environ["SMTP_USER"] = ""
+os.environ["SMTP_PASSWORD"] = ""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -30,6 +36,11 @@ from app.modules.products.products_repository import ProductRepository
 
 @pytest.fixture(scope="session", autouse=True)
 def _schema():
+    # drop_all avant create_all : create_all ignore les tables déjà présentes, donc
+    # une base de test persistante d'une exécution précédente ne recevrait pas
+    # les index/contraintes ajoutés depuis aux modèles (ex: index uniques de noms).
+    # La base est dédiée aux tests (voir DATABASE_URL ci-dessus).
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield
 

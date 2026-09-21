@@ -136,6 +136,7 @@ class AdminService:
         temp_password = generate_temp_password()
         owner.hashed_password = hash_password(temp_password)
         owner.must_change_password = True
+        owner.token_version += 1
         self._db.commit()
 
         return shop, owner, temp_password
