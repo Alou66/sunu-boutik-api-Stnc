@@ -183,37 +183,24 @@ def test_update_me_duplicate_email_returns_400(client, employee_headers, owner):
     assert "déjà utilisé" in resp.json()["detail"]
 
 
-def test_forgot_password_check_unknown_phone_returns_404(client):
-    resp = client.post("/auth/forgot-password/check", json={"phone": "779999999"})
-    assert resp.status_code == 404
+# Étape 0.1.1 : le flux par numéro de téléphone est désactivé (410, chemins et
+# schémas conservés). Le flux par e-mail est caractérisé dans
+# test_password_reset_email.py.
 
 
-def test_forgot_password_check_known_phone_returns_200(client, db_session, owner, shop):
+def test_forgot_password_check_by_phone_is_disabled(client, db_session, owner, shop):
     shop.phone = "771112233"
     db_session.commit()
     resp = client.post("/auth/forgot-password/check", json={"phone": "771112233"})
-    assert resp.status_code == 200
-    assert resp.json()["shop_name"] == shop.name
+    assert resp.status_code == 410
+    assert "n'est plus disponible" in resp.json()["detail"]
 
 
-def test_forgot_password_reset_too_short_returns_400(client, db_session, owner, shop):
-    shop.phone = "771112233"
-    db_session.commit()
-    resp = client.post("/auth/forgot-password/reset", json={"phone": "771112233", "new_password": "abc"})
-    assert resp.status_code == 400
-    assert "mot de passe" in resp.json()["detail"]
-
-
-def test_forgot_password_reset_unknown_phone_returns_404(client):
-    resp = client.post("/auth/forgot-password/reset", json={"phone": "770000000", "new_password": "NouveauMdp1"})
-    assert resp.status_code == 404
-
-
-def test_forgot_password_reset_success_allows_relogin(client, db_session, owner, shop):
+def test_forgot_password_reset_by_phone_is_disabled_and_changes_nothing(client, db_session, owner, shop):
     shop.phone = "771112233"
     db_session.commit()
     resp = client.post("/auth/forgot-password/reset", json={"phone": "771112233", "new_password": "ApresReset1"})
-    assert resp.status_code == 204
+    assert resp.status_code == 410
 
-    relogin = client.post("/auth/login", json={"email": owner.email, "password": "ApresReset1"})
-    assert relogin.status_code == 200
+    assert client.post("/auth/login", json={"email": owner.email, "password": "ApresReset1"}).status_code == 401
+    assert client.post("/auth/login", json={"email": owner.email, "password": "Test1234!"}).status_code == 200

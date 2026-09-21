@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.modules.identity.identity_model import User
-from app.modules.billing.billing_service import InvoiceNotFoundError
+from app.modules.billing.billing_service import InvoiceAlreadyCancelledError, InvoiceNotFoundError
 from app.modules.payments.payments_dto import PaymentCreate, PaymentOut, PaymentVoidRequest
 from app.modules.payments.payments_mapper import to_payment_out
 from app.modules.payments.payments_service import (
@@ -32,7 +32,7 @@ def create_payment(
         )
     except InvoiceNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except (InvoiceAlreadyPaidError, AmountExceedsBalanceError) as e:
+    except (InvoiceAlreadyPaidError, AmountExceedsBalanceError, InvoiceAlreadyCancelledError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     return to_payment_out(payment)
 

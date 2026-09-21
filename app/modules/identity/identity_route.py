@@ -2,15 +2,18 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_owner, get_current_user
-from app.core.email import send_signup_pending_emails
+from app.core.email import send_password_reset_code_email, send_signup_pending_emails
 from app.core.limiter import limiter
 from app.db.session import get_db
 from app.modules.identity.identity_dto import (
     ChangePasswordRequest,
     ForgotPasswordCheck,
+    ForgotPasswordConfirm,
+    ForgotPasswordRequest,
     LoginRequest,
     MeOut,
     MeUpdate,
+    MessageResponse,
     RegisterResponse,
     ResetPasswordRequest,
     ShopOut,
@@ -22,13 +25,13 @@ from app.modules.identity.identity_mapper import to_me_out, to_shop_out, to_user
 from app.modules.identity.identity_model import User
 from app.modules.identity.identity_service import (
     AccountDisabledError,
-    AccountNotFoundByPhoneError,
     CurrentPasswordIncorrectError,
     EmailAlreadyUsedError,
     IdentityService,
     InvalidCredentialsError,
+    InvalidResetCodeError,
     NewPasswordTooShortError,
-    PhoneNotFoundError,
+    PASSWORD_RESET_CODE_TTL,
     ProfileValidationError,
     ResetPasswordTooShortError,
     ShopNotFoundError,
@@ -135,22 +138,63 @@ def update_shop(
     return to_shop_out(shop)
 
 
+# Réinitialisation du mot de passe par e-mail + code temporaire à usage unique.
+# Remplace l'ancien flux par numéro de téléphone (routes /check et /reset
+# ci-dessous, conservées mais désactivées) : connaître le numéro d'une boutique
+# suffisait à changer le mot de passe de son premier utilisateur.
+
+_FORGOT_PASSWORD_REQUEST_MESSAGE = (
+    "Si un compte correspond à cette adresse e-mail, un code de vérification vient de lui être envoyé."
+)
+
+
+@router.post("/forgot-password/request", response_model=MessageResponse)
+@limiter.limit("5/minute")
+def forgot_password_request(
+    payload: ForgotPasswordRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    # Réponse identique que le compte existe ou non (pas d'énumération de comptes),
+    # et le code n'est jamais retourné : il part uniquement par e-mail.
+    issued = IdentityService(db).request_password_reset(payload.email)
+    if issued:
+        full_name, email, code = issued
+        background_tasks.add_task(
+            send_password_reset_code_email,
+            full_name,
+            email,
+            code,
+            int(PASSWORD_RESET_CODE_TTL.total_seconds() // 60),
+        )
+    return MessageResponse(message=_FORGOT_PASSWORD_REQUEST_MESSAGE)
+
+
+@router.post("/forgot-password/confirm", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("10/minute")
+def forgot_password_confirm(payload: ForgotPasswordConfirm, request: Request, db: Session = Depends(get_db)):
+    try:
+        IdentityService(db).confirm_password_reset(payload.email, payload.code, payload.new_password)
+    except ResetPasswordTooShortError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except InvalidResetCodeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+_PHONE_RESET_DISABLED_DETAIL = (
+    "La réinitialisation par numéro de téléphone n'est plus disponible. "
+    "Utilisez la réinitialisation par e-mail (/auth/forgot-password/request)."
+)
+
+
 @router.post("/forgot-password/check")
 @limiter.limit("10/minute")
 def forgot_password_check(payload: ForgotPasswordCheck, request: Request, db: Session = Depends(get_db)):
-    try:
-        shop = IdentityService(db).forgot_password_check(payload.phone)
-    except AccountNotFoundByPhoneError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    return {"message": "Numéro vérifié", "shop_name": shop.name}
+    raise HTTPException(status_code=status.HTTP_410_GONE, detail=_PHONE_RESET_DISABLED_DETAIL)
 
 
 @router.post("/forgot-password/reset", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("10/minute")
 def forgot_password_reset(payload: ResetPasswordRequest, request: Request, db: Session = Depends(get_db)):
-    try:
-        IdentityService(db).forgot_password_reset(payload.phone, payload.new_password)
-    except ResetPasswordTooShortError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except PhoneNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    raise HTTPException(status_code=status.HTTP_410_GONE, detail=_PHONE_RESET_DISABLED_DETAIL)

@@ -109,8 +109,9 @@ def test_employee_must_change_password_on_first_login_then_can_use_new_one(clien
     )
     assert changed.status_code == 204
 
-    me = client.get("/auth/me", headers=headers)
-    assert me.json()["user"]["must_change_password"] is False
+    # Étape 0.1.2 : un changement de mot de passe incrémente token_version, donc
+    # le JWT utilisé jusqu'ici est refusé (il fallait auparavant le réutiliser).
+    assert client.get("/auth/me", headers=headers).status_code == 401
 
     relogin = client.post("/auth/login", json={"email": "bineta@example.com", "password": "NouveauMdp1"})
     assert relogin.status_code == 200

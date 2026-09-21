@@ -48,6 +48,7 @@ class EmployeeRepository:
         self._db.commit()
 
     def has_related_records(self, employee_id: int) -> bool:
+        from app.modules.billing.billing_model import Invoice
         from app.modules.payments.payments_model import Payment
         from app.modules.stock_receipts.stock_receipts_model import StockMovement, StockReceipt
         from app.modules.transformations.transformations_model import TransformationLog
@@ -58,5 +59,9 @@ class EmployeeRepository:
             self._db.query(StockMovement.id).filter(StockMovement.created_by_id == employee_id),
             self._db.query(TransformationLog.id).filter(TransformationLog.created_by_id == employee_id),
             self._db.query(Payment.id).filter((Payment.created_by_id == employee_id) | (Payment.voided_by_id == employee_id)),
+            # invoices.created_by_id / cancelled_by_id sont des clés étrangères vers
+            # users : sans ce contrôle, supprimer l'auteur (ou l'annulateur) d'une
+            # facture échouait en violation de clé étrangère (500).
+            self._db.query(Invoice.id).filter((Invoice.created_by_id == employee_id) | (Invoice.cancelled_by_id == employee_id)),
         ]
         return any(query.first() is not None for query in checks)

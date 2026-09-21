@@ -64,6 +64,14 @@ class User(Base):
     # au moment de leur création (claim "tv") et sont rejetés si ce nombre a bougé,
     # même après une réactivation du compte (voir core/deps.get_current_user).
     token_version = Column(Integer, default=0, nullable=False)
+    # Réinitialisation du mot de passe par e-mail (voir
+    # IdentityService.request_password_reset / confirm_password_reset). Un seul
+    # code actif par utilisateur : une nouvelle demande écrase l'ancien, et un
+    # code consommé/expiré/épuisé est remis à NULL (usage unique). Seul le HMAC
+    # du code est stocké, jamais le code.
+    reset_code_hash = Column(String(64), nullable=True)
+    reset_code_expires_at = Column(DateTime, nullable=True)
+    reset_code_attempts = Column(Integer, default=0, nullable=False, server_default="0")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     shop = relationship("Shop", back_populates="users")

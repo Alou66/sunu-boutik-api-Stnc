@@ -29,6 +29,20 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordConfirm(BaseModel):
+    email: EmailStr
+    code: str
+    new_password: str
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"

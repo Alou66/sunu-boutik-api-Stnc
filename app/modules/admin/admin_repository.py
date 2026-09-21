@@ -99,4 +99,9 @@ class AdminRepository:
         )
 
     def deactivate_all_users(self, shop_id: int) -> None:
-        self._db.query(User).filter(User.shop_id == shop_id).update({User.is_active: False})
+        # token_version est incrémenté en même temps que la désactivation : sans
+        # cela, les JWT émis avant une suspension/un rejet redeviendraient
+        # valides dès la réactivation du compte (voir core/deps.get_current_user).
+        self._db.query(User).filter(User.shop_id == shop_id).update(
+            {User.is_active: False, User.token_version: User.token_version + 1}
+        )

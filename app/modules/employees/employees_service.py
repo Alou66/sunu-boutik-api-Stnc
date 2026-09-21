@@ -84,6 +84,9 @@ class EmployeeService:
             # Ce nouveau mot de passe a été choisi par le propriétaire (ex. après
             # oubli) : l'employé doit en choisir un à lui à sa prochaine connexion.
             employee.must_change_password = True
+            # Les sessions ouvertes avec l'ancien mot de passe ne doivent pas
+            # survivre à son remplacement.
+            employee.token_version += 1
 
         if "is_active" in data and data["is_active"] is not None and data["is_active"] != employee.is_active:
             employee.is_active = data["is_active"]

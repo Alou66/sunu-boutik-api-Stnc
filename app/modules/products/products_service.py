@@ -1,3 +1,4 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.categories.categories_repository import CategoryRepository
@@ -20,6 +21,14 @@ class ProductValidationError(Exception):
 
 class ProductInUseError(Exception):
     pass
+
+
+_UNIQUE_NAME_INDEX = "uq_products_shop_id_upper_name"
+
+
+def _is_duplicate_name_violation(exc: IntegrityError) -> bool:
+    diag = getattr(exc.orig, "diag", None)
+    return getattr(diag, "constraint_name", None) == _UNIQUE_NAME_INDEX
 
 
 def validate_transformation_fields(
@@ -110,7 +119,15 @@ class ProductService:
             "unit_price_secondaire": unit_price_secondaire,
         }
         product = Product(shop_id=shop_id, **data)
-        return self._repo.save_new(product)
+        try:
+            return self._repo.save_new(product)
+        except IntegrityError as exc:
+            # Deux créations simultanées du même nom passent toutes deux le
+            # contrôle exists_with_name ci-dessus : l'index unique tranche.
+            self._db.rollback()
+            if _is_duplicate_name_violation(exc):
+                raise DuplicateProductNameError("Un article portant ce nom existe déjà dans cette boutique.")
+            raise
 
     def update(self, shop_id: int, product_id: int, data: dict) -> Product:
         # `data` ne contient que les champs explicitement fournis par
@@ -151,13 +168,23 @@ class ProductService:
 
         for field, value in data.items():
             setattr(product, field, value)
-        return self._repo.save(product)
+        try:
+            return self._repo.save(product)
+        except IntegrityError as exc:
+            self._db.rollback()
+            if _is_duplicate_name_violation(exc):
+                raise DuplicateProductNameError("Un article portant ce nom existe déjà dans cette boutique.")
+            raise
 
     def delete(self, shop_id: int, product_id: int) -> None:
-        # InvoiceLine (module invoices, pas encore migré) et TransformationLog
-        # ne sont pas des tables de products : vérifiées ici directement plutôt
-        # que via ProductRepository, qui ne connaît que Product.
+        # InvoiceLine (module invoices, pas encore migré), TransformationLog et
+        # les lignes/mouvements d'approvisionnement ne sont pas des tables de
+        # products : vérifiées ici directement plutôt que via ProductRepository,
+        # qui ne connaît que Product. Toute table portant une clé étrangère vers
+        # products.id doit figurer ici, sinon la suppression échoue en violation
+        # de clé étrangère (500) au lieu d'une erreur métier (400).
         from app.modules.billing.billing_model import InvoiceLine
+        from app.modules.stock_receipts.stock_receipts_model import StockMovement, StockReceiptLine
         from app.modules.transformations.transformations_model import TransformationLog
 
         product = self.get(shop_id, product_id)
@@ -165,4 +192,8 @@ class ProductService:
             raise ProductInUseError("Impossible de supprimer : cet article est déjà utilisé dans une ou plusieurs factures")
         if self._db.query(TransformationLog).filter(TransformationLog.product_id == product_id).first():
             raise ProductInUseError("Impossible de supprimer : cet article a un historique de transformations")
+        if self._db.query(StockReceiptLine).filter(StockReceiptLine.product_id == product_id).first():
+            raise ProductInUseError("Impossible de supprimer : cet article est déjà utilisé dans une ou plusieurs réceptions de stock")
+        if self._db.query(StockMovement).filter(StockMovement.product_id == product_id).first():
+            raise ProductInUseError("Impossible de supprimer : cet article a un historique de mouvements de stock")
         self._repo.delete(product)

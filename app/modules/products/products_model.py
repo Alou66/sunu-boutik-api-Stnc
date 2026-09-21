@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, String, Boolean
+from sqlalchemy import CheckConstraint, Column, DateTime, Float, ForeignKey, Index, Integer, String, Boolean, text
 from sqlalchemy.orm import relationship
 
 from app.db.session import Base
@@ -27,6 +27,13 @@ class Product(Base):
         # vraie protection contre la survente concurrente reste le verrou FOR
         # UPDATE posé sur la ligne produit (voir billing_service.py::_apply_lines).
         CheckConstraint("quantity >= 0", name="ck_products_quantity_non_negative"),
+        # Index unique insensible à la casse : "Riz", "riz" et "RIZ" sont le même
+        # article dans une boutique donnée (même principe que
+        # uq_clients_shop_id_lower_name). La vérification applicative de
+        # products_service.py (message d'erreur clair, 409) reste la première
+        # ligne de défense ; cet index est le filet de sécurité en base, y
+        # compris contre deux créations simultanées du même nom.
+        Index("uq_products_shop_id_upper_name", "shop_id", text("upper(name)"), unique=True),
     )
 
     id = Column(Integer, primary_key=True, index=True)

@@ -1,3 +1,4 @@
+import html
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -247,6 +248,36 @@ def send_owner_password_reset_email(
         button_url=login_url,
     )
     send_email(owner_email, owner_name, "Votre mot de passe a été réinitialisé", html)
+
+
+def send_password_reset_code_email(user_name: str, user_email: str, code: str, validity_minutes: int) -> None:
+    # Ne jamais logger `code` : send_email ne logge que le destinataire.
+    code_box = f"""
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="background-color:#f3f4f6; border-radius:8px; margin:16px 0;">
+      <tr>
+        <td align="center" style="padding:20px;">
+          <p style="margin:0 0 8px 0; font-size:12px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em;">
+            Votre code de vérification
+          </p>
+          <span style="font-family:monospace; font-size:28px; font-weight:bold; letter-spacing:0.3em; color:#111827;">{code}</span>
+        </td>
+      </tr>
+    </table>
+    """
+    email_html = _layout(
+        title="Réinitialisation de votre mot de passe",
+        intro=f"Bonjour {html.escape(user_name)},",
+        body_html=(
+            "<p>Vous avez demandé à réinitialiser votre mot de passe. "
+            "Saisissez le code ci-dessous dans l'application pour en choisir un nouveau.</p>"
+            f"{code_box}"
+            f"<p>Ce code est valable <b>{validity_minutes} minutes</b> et ne peut être utilisé qu'une seule fois.</p>"
+            "<p>Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : "
+            "votre mot de passe reste inchangé. Ne communiquez jamais ce code.</p>"
+        ),
+    )
+    send_email(user_email, user_name, "Votre code de réinitialisation de mot de passe", email_html)
 
 
 def send_shop_rejected_email(
