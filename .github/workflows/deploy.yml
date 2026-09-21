@@ -69,8 +69,8 @@ jobs:
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             cd ~/sunu-boutik-infra
             docker compose -f docker-compose.prod.yml pull api
+            docker compose -f docker-compose.prod.yml run --rm --no-deps api alembic upgrade head
             docker compose -f docker-compose.prod.yml up -d --no-deps --wait api
-            docker compose -f docker-compose.prod.yml exec -T api alembic upgrade head
             docker image prune -f
 
       - name: Verify the API is healthy through the public endpoint
