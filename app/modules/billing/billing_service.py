@@ -86,9 +86,6 @@ class InvoiceService:
             raise InvoiceNotFoundError("Facture introuvable")
         return invoice
 
-    def list_for_period(self, shop_id: int, start, end):
-        return self._repo.list_for_period(shop_id, start, end)
-
     def get_shop(self, shop_id: int):
         from app.modules.identity.identity_model import Shop
 

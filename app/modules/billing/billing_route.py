@@ -1,6 +1,4 @@
 import io
-import zipfile
-from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -11,7 +9,7 @@ from app.db.session import get_db
 from app.modules.identity.identity_model import User
 from app.modules.billing.billing_dto import InvoiceCancelRequest, InvoiceCreate, InvoiceListOut, InvoiceOut, InvoiceUpdate
 from app.modules.billing.billing_mapper import to_invoice_out
-from app.modules.billing.billing_pdf import build_export_ticket_pdf, build_invoice_pdf
+from app.modules.billing.billing_pdf import build_invoice_pdf
 from app.modules.billing.billing_service import (
     InsufficientStockError,
     InvoiceAlreadyCancelledError,
@@ -78,56 +76,6 @@ def create_invoice(payload: InvoiceCreate, db: Session = Depends(get_db), curren
     return to_invoice_out(invoice)
 
 
-@router.get("/export")
-def export_invoices_zip(
-    date_from: str | None = None,
-    date_to: str | None = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    now = datetime.utcnow()
-    if date_from:
-        try:
-            start = datetime.strptime(date_from, "%Y-%m-%d")
-        except ValueError:
-            raise HTTPException(400, "Format date_from invalide (AAAA-MM-JJ)")
-    else:
-        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    if date_to:
-        try:
-            end = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
-        except ValueError:
-            raise HTTPException(400, "Format date_to invalide (AAAA-MM-JJ)")
-    else:
-        if now.month == 12:
-            end = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        else:
-            end = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    service = InvoiceService(db)
-    invoices = service.list_for_period(current_user.shop_id, start, end)
-    shop = service.get_shop(current_user.shop_id)
-
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for inv in invoices:
-            client = service.get_client_unscoped(inv.client_id)
-            pdf_bytes = build_export_ticket_pdf(inv, shop, client)
-            safe_num = inv.number.replace("/", "-").replace("\\", "-")
-            zf.writestr(f"{safe_num}.pdf", pdf_bytes)
-
-    zip_buffer.seek(0)
-    period_str = f"{start.strftime('%Y-%m-%d')}_{(end - timedelta(days=1)).strftime('%Y-%m-%d')}"
-    filename = f"EIP_factures_{period_str}.zip"
-
-    return StreamingResponse(
-        zip_buffer,
-        media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
-
-
 @router.get("/{invoice_id}", response_model=InvoiceOut)
 def get_invoice(invoice_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
@@ -188,7 +136,6 @@ def delete_invoice(invoice_id: int, db: Session = Depends(get_db), current_user:
 @router.get("/{invoice_id}/pdf")
 def get_invoice_pdf(
     invoice_id: int,
-    format: str = "ticket",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -201,7 +148,7 @@ def get_invoice_pdf(
     shop = service.get_shop(current_user.shop_id)
     client = service.get_client_unscoped(invoice.client_id)
 
-    pdf_bytes = build_invoice_pdf(invoice, shop, client, format)
+    pdf_bytes = build_invoice_pdf(invoice, shop, client)
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",

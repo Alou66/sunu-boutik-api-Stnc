@@ -119,12 +119,3 @@ class InvoiceRepository:
             .scalar()
         )
         return (max_suffix or 0) + 1
-
-    def list_for_period(self, shop_id: int, start, end):
-        return (
-            self._db.query(Invoice)
-            .options(joinedload(Invoice.lines))
-            .filter(Invoice.shop_id == shop_id, Invoice.created_at >= start, Invoice.created_at < end)
-            .order_by(Invoice.created_at.asc())
-            .all()
-        )
