@@ -70,7 +70,6 @@ Le code est organisé en **modules verticaux** (`app/modules/<domaine>/`), chacu
 | Rate limiting | `slowapi` (ex : 5 tentatives/min sur l'inscription, 10/min sur le login) |
 | Emails transactionnels | SMTP Gmail (notifications d'inscription) |
 | Génération de PDF | `reportlab` (factures) |
-| Export Excel | `openpyxl` |
 | Tests | `pytest` (tests dits "characterization" par module) |
 | Déploiement | Docker + [Render](https://render.com) (`render.yaml`) |
 
@@ -87,8 +86,7 @@ sunu-boutik-api/
 │   │   ├── security.py       # Hash mot de passe, création/décodage JWT
 │   │   ├── deps.py           # Dépendances FastAPI : get_current_user, get_current_admin
 │   │   ├── email.py          # Envoi d'emails transactionnels (SMTP Gmail)
-│   │   ├── limiter.py        # Configuration slowapi (rate limiting)
-│   │   └── uploads.py        # Gestion des fichiers uploadés (logos, etc.)
+│   │   └── limiter.py        # Configuration slowapi (rate limiting)
 │   ├── db/
 │   │   └── session.py        # Engine SQLAlchemy, Base, SessionLocal, get_db
 │   └── modules/               # Un dossier par domaine métier (voir tableau ci-dessus)
@@ -96,7 +94,6 @@ sunu-boutik-api/
 ├── tests/
 │   └── characterization/      # Tests de non-régression par module + contrat OpenAPI
 ├── scripts/                   # Scripts utilitaires (seed de données de démo)
-├── uploads/                   # Fichiers uploadés en local (logos boutiques, etc.)
 ├── requirements.txt
 ├── Dockerfile
 ├── render.yaml                 # Déploiement sur Render

@@ -1,6 +1,5 @@
 """Génération PDF des factures au format A4 (endpoint /pdf)."""
 import io
-from pathlib import Path
 
 from app.modules.billing.billing_model import InvoiceStatus
 
@@ -28,7 +27,7 @@ def build_invoice_pdf(invoice, shop, client) -> bytes:
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.enums import TA_CENTER
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 
@@ -39,10 +38,6 @@ def build_invoice_pdf(invoice, shop, client) -> bytes:
 
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=20 * mm, bottomMargin=20 * mm)
     els = []
-
-    if shop.logo_path and Path(shop.logo_path).exists():
-        els.append(Image(shop.logo_path, width=30 * mm, height=30 * mm, kind="proportional"))
-        els.append(Spacer(1, 4 * mm))
 
     els.append(Paragraph(f"<b>{shop.name}</b>", base["Title"]))
     if shop.address:

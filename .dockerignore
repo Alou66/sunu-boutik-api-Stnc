@@ -10,7 +10,6 @@ server.log
 .git/
 .gitignore
 render.yaml
-uploads/
 .pytest_cache/
 pytest.ini
 tests/

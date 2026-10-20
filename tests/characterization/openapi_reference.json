@@ -14,9 +14,9 @@
         "operationId": "register_auth_register_post",
         "requestBody": {
           "content": {
-            "multipart/form-data": {
+            "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Body_register_auth_register_post"
+                "$ref": "#/components/schemas/RegisterRequest"
               }
             }
           },
@@ -3824,107 +3824,6 @@
   },
   "components": {
     "schemas": {
-      "Body_register_auth_register_post": {
-        "properties": {
-          "shop_name": {
-            "type": "string",
-            "title": "Shop Name"
-          },
-          "shop_address": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Shop Address"
-          },
-          "shop_phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Shop Phone"
-          },
-          "shop_phone2": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Shop Phone2"
-          },
-          "shop_phone3": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Shop Phone3"
-          },
-          "shop_ninea": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Shop Ninea"
-          },
-          "shop_rc": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Shop Rc"
-          },
-          "full_name": {
-            "type": "string",
-            "title": "Full Name"
-          },
-          "email": {
-            "type": "string",
-            "title": "Email"
-          },
-          "logo": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "binary"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Logo"
-          }
-        },
-        "type": "object",
-        "required": [
-          "shop_name",
-          "full_name",
-          "email"
-        ],
-        "title": "Body_register_auth_register_post"
-      },
       "BonClientCreate": {
         "properties": {
           "title": {
@@ -5875,6 +5774,96 @@
           "dormant_products"
         ],
         "title": "RankingsOut"
+      },
+      "RegisterRequest": {
+        "properties": {
+          "shop_name": {
+            "type": "string",
+            "title": "Shop Name"
+          },
+          "shop_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shop Address"
+          },
+          "shop_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shop Phone"
+          },
+          "shop_phone2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shop Phone2"
+          },
+          "shop_phone3": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shop Phone3"
+          },
+          "shop_ninea": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shop Ninea"
+          },
+          "shop_rc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shop Rc"
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "shop_name",
+          "full_name",
+          "email"
+        ],
+        "title": "RegisterRequest"
       },
       "RegisterResponse": {
         "properties": {

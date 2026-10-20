@@ -32,7 +32,6 @@ class Shop(Base):
     ninea = Column(String(50), nullable=True)
     rc = Column(String(100), nullable=True)
     status = Column(Enum(ShopStatus), default=ShopStatus.PENDING, nullable=False)
-    logo_path = Column(String(500), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     reviewed_at = Column(DateTime, nullable=True)
 

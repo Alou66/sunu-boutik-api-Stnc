@@ -1,23 +1,18 @@
-"""Caractérise /auth/* (module identity) : inscription (avec et sans logo),
-connexion selon le statut de la boutique, /me, changement de mot de passe,
-mise à jour boutique, mot de passe oublié.
+"""Caractérise /auth/* (module identity) : inscription, connexion selon le
+statut de la boutique, /me, changement de mot de passe, mise à jour boutique,
+mot de passe oublié.
 
 Réf. app/modules/identity/identity_service.py — aucun test de caractérisation
-n'existait pour ce routeur avant la migration ; ce fichier ferme ce trou,
-y compris le chemin d'upload de logo jamais exercé, même manuellement,
-pendant la migration.
+n'existait pour ce routeur avant la migration ; ce fichier ferme ce trou.
 """
-import glob
-import os
-
 from app.core.security import hash_password
 from app.modules.identity.identity_model import Shop, ShopStatus, User
 
 
-def test_register_without_logo_creates_pending_shop_and_inactive_user(client, db_session):
+def test_register_creates_pending_shop_and_inactive_user(client, db_session):
     resp = client.post(
         "/auth/register",
-        data={"shop_name": "Boutique Test", "full_name": "Awa Ndiaye", "email": "awa@example.com"},
+        json={"shop_name": "Boutique Test", "full_name": "Awa Ndiaye", "email": "awa@example.com"},
     )
     assert resp.status_code == 201
 
@@ -28,36 +23,9 @@ def test_register_without_logo_creates_pending_shop_and_inactive_user(client, db
     assert user.hashed_password is None
 
 
-def test_register_with_logo_saves_file(client, db_session):
-    resp = client.post(
-        "/auth/register",
-        data={"shop_name": "Boutique Logo", "full_name": "Test Logo", "email": "logo@example.com"},
-        files={"logo": ("logo.png", b"\x89PNG\r\n\x1a\nfake-bytes", "image/png")},
-    )
-    assert resp.status_code == 201
-
-    user = db_session.query(User).filter(User.email == "logo@example.com").first()
-    shop = db_session.query(Shop).filter(Shop.id == user.shop_id).first()
-    assert shop.logo_path is not None
-    assert os.path.exists(shop.logo_path)
-    os.remove(shop.logo_path)  # nettoyage — uploads/ est gitignored mais autant ne pas laisser traîner
-
-
-def test_register_with_invalid_logo_content_type_returns_400(client):
-    resp = client.post(
-        "/auth/register",
-        data={"shop_name": "Boutique Bad Logo", "full_name": "Test", "email": "badlogo@example.com"},
-        files={"logo": ("logo.txt", b"not-an-image", "text/plain")},
-    )
-    assert resp.status_code == 400
-    assert "image" in resp.json()["detail"]
-    for f in glob.glob("uploads/logos/*badlogo*"):
-        os.remove(f)
-
-
 def test_register_duplicate_email_returns_400(client):
-    client.post("/auth/register", data={"shop_name": "A", "full_name": "A", "email": "dup@example.com"})
-    resp = client.post("/auth/register", data={"shop_name": "B", "full_name": "B", "email": "dup@example.com"})
+    client.post("/auth/register", json={"shop_name": "A", "full_name": "A", "email": "dup@example.com"})
+    resp = client.post("/auth/register", json={"shop_name": "B", "full_name": "B", "email": "dup@example.com"})
     assert resp.status_code == 400
     assert "déjà utilisé" in resp.json()["detail"]
 

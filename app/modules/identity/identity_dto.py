@@ -10,6 +10,18 @@ def _normalize(value: Optional[str]) -> Optional[str]:
     return value or None
 
 
+class RegisterRequest(BaseModel):
+    shop_name: str
+    shop_address: Optional[str] = None
+    shop_phone: Optional[str] = None
+    shop_phone2: Optional[str] = None
+    shop_phone3: Optional[str] = None
+    shop_ninea: Optional[str] = None
+    shop_rc: Optional[str] = None
+    full_name: str
+    email: EmailStr
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str

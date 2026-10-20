@@ -5,5 +5,4 @@ venv/
 .venv/
 *.db
 *.log
-uploads/
 .pytest_cache/

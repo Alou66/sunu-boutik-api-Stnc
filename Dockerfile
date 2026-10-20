@@ -33,15 +33,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && addgroup --system app && adduser --system --ingroup app --home /app app
 
-COPY --from=builder /opt/venv /opt/venv
+    COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 COPY . .
 
-RUN mkdir -p /app/uploads \
-    && chown -R app:app /app
+RUN chown -R app:app /app
 
 USER app
 

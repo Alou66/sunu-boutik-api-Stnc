@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_owner, get_current_user
@@ -14,6 +14,7 @@ from app.modules.identity.identity_dto import (
     MeOut,
     MeUpdate,
     MessageResponse,
+    RegisterRequest,
     RegisterResponse,
     ResetPasswordRequest,
     ShopOut,
@@ -48,22 +49,20 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def register(
     request: Request,
     background_tasks: BackgroundTasks,
-    shop_name: str = Form(...),
-    shop_address: str | None = Form(None),
-    shop_phone: str | None = Form(None),
-    shop_phone2: str | None = Form(None),
-    shop_phone3: str | None = Form(None),
-    shop_ninea: str | None = Form(None),
-    shop_rc: str | None = Form(None),
-    full_name: str = Form(...),
-    email: str = Form(...),
-    logo: UploadFile | None = File(None),
+    payload: RegisterRequest,
     db: Session = Depends(get_db),
 ):
     try:
         shop, user = await IdentityService(db).register(
-            shop_name, shop_address, shop_phone, shop_phone2, shop_phone3, shop_ninea, shop_rc,
-            full_name, email, logo,
+            payload.shop_name,
+            payload.shop_address,
+            payload.shop_phone,
+            payload.shop_phone2,
+            payload.shop_phone3,
+            payload.shop_ninea,
+            payload.shop_rc,
+            payload.full_name,
+            payload.email,
         )
     except EmailAlreadyUsedError as e:
         raise HTTPException(status_code=400, detail=str(e))

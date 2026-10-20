@@ -10,7 +10,6 @@ from app.core.security import (
     verify_password,
     verify_reset_code,
 )
-from app.core.uploads import save_shop_logo
 from app.modules.identity.identity_model import Shop, ShopStatus, User, UserRole
 from app.modules.identity.identity_repository import IdentityRepository
 
@@ -90,7 +89,6 @@ class IdentityService:
         shop_rc: str | None,
         full_name: str,
         email: str,
-        logo,
     ) -> tuple[Shop, User]:
         existing = self._repo.find_user_by_email(email)
         if existing:
@@ -108,9 +106,6 @@ class IdentityService:
         )
         self._db.add(shop)
         self._db.flush()
-
-        if logo and logo.filename:
-            shop.logo_path = await save_shop_logo(shop.id, logo)
 
         user = User(
             shop_id=shop.id,
