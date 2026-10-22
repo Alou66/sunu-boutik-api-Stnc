@@ -29,6 +29,8 @@ from app.modules.transformations import transformations_model  # noqa: E402,F401
 from app.modules.bon_client import bon_client_model  # noqa: E402,F401
 from app.modules.suppliers import suppliers_model  # noqa: E402,F401
 from app.modules.stock_receipts import stock_receipts_model  # noqa: E402,F401
+from app.modules.stock_initializations import stock_initializations_model  # noqa: E402,F401
+from app.modules.stock_adjustments import stock_adjustments_model  # noqa: E402,F401  # noqa: E402,F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

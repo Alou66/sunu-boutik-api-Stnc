@@ -23,6 +23,8 @@ from app.modules.payments.payments_route import router as payments_router
 from app.modules.products.products_route import router as products_router
 from app.modules.statistics.statistics_route import router as statistics_router
 from app.modules.stock_receipts.stock_receipts_route import router as stock_receipts_router
+from app.modules.stock_initializations.stock_initializations_route import router as stock_initializations_router
+from app.modules.stock_adjustments.stock_adjustments_route import router as stock_adjustments_router
 from app.modules.suppliers.suppliers_route import router as suppliers_router
 from app.modules.transformations.transformations_route import router as transformations_router
 
@@ -98,6 +100,8 @@ app.include_router(transformations_router)
 app.include_router(bon_client_router)
 app.include_router(suppliers_router)
 app.include_router(stock_receipts_router)
+app.include_router(stock_initializations_router)
+app.include_router(stock_adjustments_router)
 app.include_router(statistics_router)
 app.include_router(employees_router)
 
