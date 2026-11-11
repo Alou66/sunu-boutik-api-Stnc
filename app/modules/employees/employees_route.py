@@ -69,6 +69,8 @@ def lookup_employees(
     # Accessible à tout utilisateur connecté (pas seulement le propriétaire) :
     # sert à peupler le filtre "par employé" des factures, que n'importe quel
     # employé doit pouvoir utiliser.
+    if current_user.shop_id is None:
+        return []
     users = EmployeeService(db).list_all_for_shop(current_user.shop_id)
     return [UserLookupOut.model_validate(u) for u in users]
 

@@ -3461,6 +3461,124 @@
         }
       }
     },
+    "/stock-initializations/pending": {
+      "get": {
+        "tags": [
+          "stock-initializations"
+        ],
+        "summary": "List Pending",
+        "operationId": "list_pending_stock_initializations_pending_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockInitializationPendingOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/stock-initializations": {
+      "post": {
+        "tags": [
+          "stock-initializations"
+        ],
+        "summary": "Create Initialization",
+        "operationId": "create_initialization_stock_initializations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockInitializationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockInitializationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/stock-adjustments": {
+      "post": {
+        "tags": [
+          "stock-adjustments"
+        ],
+        "summary": "Create Adjustment",
+        "operationId": "create_adjustment_stock_adjustments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockAdjustmentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockAdjustmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/statistics": {
       "get": {
         "tags": [
@@ -6325,6 +6443,324 @@
           "rankings"
         ],
         "title": "StatisticsOut"
+      },
+      "StockAdjustmentCreate": {
+        "properties": {
+          "product_id": {
+            "type": "integer",
+            "title": "Product Id"
+          },
+          "unit_target": {
+            "type": "string",
+            "title": "Unit Target"
+          },
+          "adjustment_type": {
+            "type": "string",
+            "title": "Adjustment Type"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "unit_target",
+          "adjustment_type",
+          "quantity",
+          "reason"
+        ],
+        "title": "StockAdjustmentCreate"
+      },
+      "StockAdjustmentOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "shop_id": {
+            "type": "integer",
+            "title": "Shop Id"
+          },
+          "product_id": {
+            "type": "integer",
+            "title": "Product Id"
+          },
+          "product_name": {
+            "type": "string",
+            "title": "Product Name"
+          },
+          "unit_target": {
+            "type": "string",
+            "title": "Unit Target"
+          },
+          "adjustment_type": {
+            "type": "string",
+            "title": "Adjustment Type"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "quantity_delta": {
+            "type": "number",
+            "title": "Quantity Delta"
+          },
+          "stock_before": {
+            "type": "number",
+            "title": "Stock Before"
+          },
+          "stock_after": {
+            "type": "number",
+            "title": "Stock After"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "created_by_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "shop_id",
+          "product_id",
+          "product_name",
+          "unit_target",
+          "adjustment_type",
+          "quantity",
+          "quantity_delta",
+          "stock_before",
+          "stock_after",
+          "reason",
+          "created_at"
+        ],
+        "title": "StockAdjustmentOut"
+      },
+      "StockInitializationCreate": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/StockInitializationLineIn"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "title": "StockInitializationCreate"
+      },
+      "StockInitializationLineIn": {
+        "properties": {
+          "product_id": {
+            "type": "integer",
+            "title": "Product Id"
+          },
+          "unit_target": {
+            "type": "string",
+            "title": "Unit Target"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "unit_target"
+        ],
+        "title": "StockInitializationLineIn"
+      },
+      "StockInitializationLineOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "product_id": {
+            "type": "integer",
+            "title": "Product Id"
+          },
+          "product_name": {
+            "type": "string",
+            "title": "Product Name"
+          },
+          "unit_target": {
+            "type": "string",
+            "title": "Unit Target"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "product_id",
+          "product_name",
+          "unit_target",
+          "quantity",
+          "created_at"
+        ],
+        "title": "StockInitializationLineOut"
+      },
+      "StockInitializationLinePendingOut": {
+        "properties": {
+          "product_id": {
+            "type": "integer",
+            "title": "Product Id"
+          },
+          "product_name": {
+            "type": "string",
+            "title": "Product Name"
+          },
+          "category_id": {
+            "type": "integer",
+            "title": "Category Id"
+          },
+          "category_name": {
+            "type": "string",
+            "title": "Category Name"
+          },
+          "unit_target": {
+            "type": "string",
+            "title": "Unit Target"
+          },
+          "unit_label": {
+            "type": "string",
+            "title": "Unit Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "product_name",
+          "category_id",
+          "category_name",
+          "unit_target",
+          "unit_label"
+        ],
+        "title": "StockInitializationLinePendingOut"
+      },
+      "StockInitializationOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "shop_id": {
+            "type": "integer",
+            "title": "Shop Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_by_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/StockInitializationLineOut"
+            },
+            "type": "array",
+            "title": "Lines",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "shop_id",
+          "created_at"
+        ],
+        "title": "StockInitializationOut"
+      },
+      "StockInitializationPendingOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StockInitializationLinePendingOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "StockInitializationPendingOut"
       },
       "StockMovementListOut": {
         "properties": {

@@ -1,8 +1,4 @@
-name: Build API image
-
-# Build + publication GHCR uniquement. Le déploiement sur les EC2 se fait
-# séparément, par Ansible (repo sunu-boutik-infra, ansible/DEPLOYMENT.md),
-# avec le tag sha-<commit> produit ici. Aucune connexion aux serveurs.
+name: Test and Build API image
 
 on:
   push:
@@ -11,16 +7,66 @@ on:
 
 concurrency:
   group: build-api-${{ github.ref }}
-  # Chaque commit de main doit avoir son image (cible potentielle de rollback).
   cancel-in-progress: false
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
-  build-and-push:
+  test:
+    name: Run API tests
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: sunu_boutik_test
+          POSTGRES_USER: testuser
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5544:5432
+        options: >-
+          --health-cmd "pg_isready -U testuser -d sunu_boutik_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install API and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 httpx==0.27.2
+
+      - name: Run complete test suite
+        env:
+          DATABASE_URL: postgresql://testuser@127.0.0.1:5544/sunu_boutik_test
+          SECRET_KEY: test-secret-key-not-for-production
+          SMTP_USER: ""
+          SMTP_PASSWORD: ""
+        run: python -m pytest -q
+
+  build-and-push:
+    name: Build and publish API image
+    needs: test
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -40,7 +86,6 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}
-          # Tag immuable uniquement : sha-<SHA complet>. Pas de `latest`.
           tags: |
             type=sha,format=long
 
@@ -61,5 +106,6 @@ jobs:
             echo
             echo "\`${{ steps.meta.outputs.tags }}\`"
             echo
-            echo "Déploiement (manuel, repo infra) : \`api_image_tag: sha-${{ github.sha }}\`"
+            echo "Déploiement manuel via Ansible/SSM."
+            echo "Tag : \`api_image_tag: sha-${{ github.sha }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
