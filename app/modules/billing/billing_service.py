@@ -237,12 +237,6 @@ class InvoiceService:
 
         client_name = (client_name or "").strip() or None
 
-        # Sérialise avec toute autre création de facture pour cette boutique
-        # (voir _lock_shop_for_numbering). L'idempotence est vérifiée juste
-        # après ce verrou : une resoumission (double clic sur "Valider", retry
-        # réseau) concurrente attend ce même verrou puis retrouve la facture
-        # déjà créée par la première tentative, au lieu de décrémenter le
-        # stock une seconde fois pour la même vente.
         self._lock_shop_for_numbering(shop_id)
 
         if idempotency_key:
