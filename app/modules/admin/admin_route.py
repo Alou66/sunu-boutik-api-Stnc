@@ -84,7 +84,6 @@ def shop_stats(shop_id: int, db: Session = Depends(get_db), _admin: User = Depen
 @router.post("/shops/{shop_id}/approve", response_model=ShopAdminOut)
 def approve_shop(
     shop_id: int,
-    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _admin: User = Depends(get_current_admin),
@@ -95,9 +94,8 @@ def approve_shop(
         raise HTTPException(status_code=404, detail=str(e))
 
     if owner:
-        origin = request.headers.get("origin")
         background_tasks.add_task(
-            send_shop_approved_email, owner.full_name, owner.email, shop.name, temp_password, origin
+            send_shop_approved_email, owner.full_name, owner.email, shop.name, temp_password
         )
 
     return to_shop_admin_out(shop, owner)
@@ -107,7 +105,6 @@ def approve_shop(
 def reject_shop(
     shop_id: int,
     payload: RejectRequest,
-    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _admin: User = Depends(get_current_admin),
@@ -118,9 +115,8 @@ def reject_shop(
         raise HTTPException(status_code=404, detail=str(e))
 
     if owner:
-        origin = request.headers.get("origin")
         background_tasks.add_task(
-            send_shop_rejected_email, owner.full_name, owner.email, shop.name, payload.reason, origin
+            send_shop_rejected_email, owner.full_name, owner.email, shop.name, payload.reason
         )
 
     return to_shop_admin_out(shop, owner)
@@ -130,7 +126,6 @@ def reject_shop(
 def suspend_shop(
     shop_id: int,
     payload: SuspendRequest,
-    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _admin: User = Depends(get_current_admin),
@@ -143,9 +138,8 @@ def suspend_shop(
         raise HTTPException(status_code=409, detail=str(e))
 
     if owner:
-        origin = request.headers.get("origin")
         background_tasks.add_task(
-            send_shop_suspended_email, owner.full_name, owner.email, shop.name, payload.reason, origin
+            send_shop_suspended_email, owner.full_name, owner.email, shop.name, payload.reason
         )
 
     return to_shop_admin_out(shop, owner)
@@ -154,7 +148,6 @@ def suspend_shop(
 @router.patch("/shops/{shop_id}/reactivate", response_model=ShopAdminOut)
 def reactivate_shop(
     shop_id: int,
-    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _admin: User = Depends(get_current_admin),
@@ -167,9 +160,8 @@ def reactivate_shop(
         raise HTTPException(status_code=409, detail=str(e))
 
     if owner:
-        origin = request.headers.get("origin")
         background_tasks.add_task(
-            send_shop_reactivated_email, owner.full_name, owner.email, shop.name, origin
+            send_shop_reactivated_email, owner.full_name, owner.email, shop.name
         )
 
     return to_shop_admin_out(shop, owner)
@@ -178,7 +170,6 @@ def reactivate_shop(
 @router.post("/shops/{shop_id}/owner/reset-password", response_model=MessageOut)
 def reset_owner_password(
     shop_id: int,
-    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _admin: User = Depends(get_current_admin),
@@ -190,9 +181,8 @@ def reset_owner_password(
     except OwnerNotFoundError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
-    origin = request.headers.get("origin")
     background_tasks.add_task(
-        send_owner_password_reset_email, owner.full_name, owner.email, shop.name, temp_password, origin
+        send_owner_password_reset_email, owner.full_name, owner.email, shop.name, temp_password
     )
 
     return MessageOut(message=f"Un nouveau mot de passe a été envoyé à {owner.email}")

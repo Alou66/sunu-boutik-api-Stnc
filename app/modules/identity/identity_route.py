@@ -67,10 +67,9 @@ async def register(
     except EmailAlreadyUsedError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    origin = request.headers.get("origin")
-    background_tasks.add_task(
-        send_signup_pending_emails, shop.name, user.full_name, user.email, origin
-    )
+    # Les liens de l'e-mail viennent de settings.FRONTEND_URL, jamais de l'en-tête
+    # Origin (falsifiable par n'importe quel client HTTP).
+    background_tasks.add_task(send_signup_pending_emails, shop.name, user.full_name, user.email)
 
     return RegisterResponse(
         message="Votre demande a été enregistrée. Elle est en cours de traitement par notre équipe."
